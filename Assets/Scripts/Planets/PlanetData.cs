@@ -12,4 +12,7 @@ public class PlanetData
     public float distanceFromSun = 1f;
 
     public bool explored = false;
+
+    [Tooltip("Score used by probe to prioritize this planet as next target")]
+    public float explorationScore = 0f;
 }

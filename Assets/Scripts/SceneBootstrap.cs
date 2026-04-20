@@ -38,7 +38,7 @@ public class SceneBootstrap : MonoBehaviour
 
     void ConfigureLighting()
     {
-        foreach (var l in Object.FindObjectsByType<Light>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (var l in Object.FindObjectsByType<Light>(FindObjectsInactive.Include))
         {
             if (l.type == LightType.Directional) l.enabled = false;
         }
@@ -55,7 +55,7 @@ public class SceneBootstrap : MonoBehaviour
             sunLight.shadows = LightShadows.None;
         }
 
-        foreach (var c in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include, FindObjectsSortMode.None))
+        foreach (var c in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
         {
             c.allowHDR = true;
             var urp = c.GetUniversalAdditionalCameraData();
@@ -98,7 +98,7 @@ public class SceneBootstrap : MonoBehaviour
             sunSpin.degreesPerSecond = 8f;
         }
 
-        var planets = Object.FindObjectsByType<Planet>(FindObjectsInactive.Exclude, FindObjectsSortMode.None);
+        var planets = Object.FindObjectsByType<Planet>(FindObjectsInactive.Exclude);
         float angle = 0f;
         float angleStep = Mathf.PI * 2f / Mathf.Max(1, planets.Length);
         Transform sunT = sun != null ? sun.transform : null;

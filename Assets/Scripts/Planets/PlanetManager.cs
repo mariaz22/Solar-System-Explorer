@@ -13,7 +13,7 @@ public class PlanetManager : MonoBehaviour
         Instance = this;
 
         if (planets == null || planets.Count == 0)
-            planets = new List<Planet>(FindObjectsByType<Planet>(FindObjectsInactive.Exclude, FindObjectsSortMode.None));
+            planets = new List<Planet>(FindObjectsByType<Planet>(FindObjectsInactive.Exclude));
     }
 
     public Planet FindByName(string n) =>

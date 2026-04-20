@@ -35,6 +35,6 @@ public class ProbeTrail : MonoBehaviour
 
     void Update()
     {
-        trail.emitting = probe.CurrentState == ProbeController.State.Traveling;
+        trail.emitting = probe.FSM.CurrentState is TravelState;
     }
 }

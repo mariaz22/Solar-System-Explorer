@@ -87,16 +87,21 @@ public class PlanetSelectionUI : MonoBehaviour
         if (infoText == null || selected == null) return;
 
         var d = selected.data;
+        string probeStatus = probe != null && probe.TargetReason != ""
+            ? $"\n<i>{probe.TargetReason}</i>"
+            : "";
+
         infoText.text =
             $"<b>{d.planetName}</b>\n" +
             $"Mass (Earth=1): {d.relativeMass:0.##}\n" +
             $"Distance from Sun (AU): {d.distanceFromSun:0.##}\n" +
-            $"Status: {(d.explored ? "Explored" : "Unexplored")}";
+            $"Status: {(d.explored ? "Explored" : "Unexplored")}" +
+            probeStatus;
     }
 
     void OnSendProbe()
     {
         if (probe == null || selected == null) return;
-        probe.ChooseTarget(selected);
+        probe.SetTarget(selected);
     }
 }
