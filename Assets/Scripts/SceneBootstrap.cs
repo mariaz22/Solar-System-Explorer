@@ -156,6 +156,7 @@ public class SceneBootstrap : MonoBehaviour
             probe.transform.localScale = Vector3.one * 0.6f;
             TintRenderer(probe.gameObject, new Color(0.9f, 0.2f, 0.9f), emissive: true);
             if (probe.GetComponent<ProbeTrail>() == null) probe.gameObject.AddComponent<ProbeTrail>();
+            if (probe.GetComponent<ProbeVFX>() == null) probe.gameObject.AddComponent<ProbeVFX>();
         }
 
         var cam = Camera.main;

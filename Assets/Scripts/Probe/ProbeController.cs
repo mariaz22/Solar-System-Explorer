@@ -1,16 +1,18 @@
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 [RequireComponent(typeof(PathVisualizer))]
 public class ProbeController : MonoBehaviour
 {
-    public enum State { Idle, ChooseTarget, Traveling, Arrived }
+    public enum State { Idle, ChooseTarget, Travel, AvoidCollision, Scan, Arrived }
 
     public float speed = 10f;
     public float arrivalThreshold = 0.5f;
 
     public State CurrentState { get; private set; } = State.Idle;
     public Planet Target { get; private set; }
+    public event Action<State> StateChanged;
 
     PathVisualizer vis;
     List<Vector3> path;
@@ -26,7 +28,7 @@ public class ProbeController : MonoBehaviour
         if (planet == null) return;
 
         Target = planet;
-        CurrentState = State.ChooseTarget;
+        SetState(State.ChooseTarget);
 
         var planets = PlanetManager.Instance != null ? PlanetManager.Instance.planets : null;
 
@@ -39,18 +41,18 @@ public class ProbeController : MonoBehaviour
         {
             vis.Show(path);
             waypointIndex = 1;
-            CurrentState = State.Traveling;
+            SetState(State.Travel);
         }
         else
         {
             Debug.LogWarning($"Probe: no path found to {planet.data.planetName}");
-            CurrentState = State.Idle;
+            SetState(State.Idle);
         }
     }
 
     void Update()
     {
-        if (CurrentState != State.Traveling || path == null) return;
+        if ((CurrentState != State.Travel && CurrentState != State.AvoidCollision) || path == null) return;
 
         Vector3 next = (waypointIndex == path.Count - 1 && Target != null)
             ? Target.transform.position - (Target.transform.position - transform.position).normalized * (Target.radius + 1f)
@@ -66,10 +68,18 @@ public class ProbeController : MonoBehaviour
             waypointIndex++;
             if (waypointIndex >= path.Count)
             {
-                CurrentState = State.Arrived;
+                SetState(State.Scan);
                 if (Target != null) Target.data.explored = true;
                 vis.Hide();
             }
         }
+    }
+
+    void SetState(State nextState)
+    {
+        if (CurrentState == nextState) return;
+
+        CurrentState = nextState;
+        StateChanged?.Invoke(CurrentState);
     }
 }

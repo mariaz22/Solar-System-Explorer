@@ -17,6 +17,7 @@ public class PlanetSelectionUI : MonoBehaviour
     public ProbeController probe;
 
     Planet selected;
+    public Planet SelectedPlanet => selected;
 
     void Start()
     {
@@ -72,8 +73,6 @@ public class PlanetSelectionUI : MonoBehaviour
         selected.SetSelected(true);
 
         UpdateInfo();
-
-        if (CameraController.Instance != null) CameraController.Instance.MoveTo(p);
 
         if (dropdown != null && PlanetManager.Instance != null)
         {
