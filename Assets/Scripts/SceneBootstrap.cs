@@ -479,59 +479,97 @@ public class SceneBootstrap : MonoBehaviour
         var ss = ssGO.AddComponent<StartScreen>();
         ss.Setup();
 
+        // ── Planet panel ──
+        StylePlanetPanel();
+
         // ── Time Scale UI ──
         CreateTimeScaleUI();
+    }
 
-        // ── PlanetSelectionUI canvas ──
+    void StylePlanetPanel()
+    {
         var ui = Object.FindAnyObjectByType<PlanetSelectionUI>();
         if (ui == null) return;
+        var existingCanvas = ui.GetComponentInParent<Canvas>();
+        if (existingCanvas == null) return;
 
-        var canvas = ui.GetComponentInParent<Canvas>();
-        if (canvas == null) return;
-
-        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        var scaler = canvas.GetComponent<CanvasScaler>();
-        if (scaler == null) scaler = canvas.gameObject.AddComponent<CanvasScaler>();
-        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-        scaler.referenceResolution = new Vector2(1920, 1080);
-        scaler.matchWidthOrHeight = 0.5f;
-
-        var canvasRT = canvas.GetComponent<RectTransform>();
-
-        for (int i = canvasRT.childCount - 1; i >= 0; i--)
+        // Hide original raw panel children
+        var existingRT = existingCanvas.GetComponent<RectTransform>();
+        for (int i = existingRT.childCount - 1; i >= 0; i--)
         {
-            var child = canvasRT.GetChild(i);
-            if (child.name == "Panel")
-            {
-                child.gameObject.SetActive(false);
-            }
+            var ch = existingRT.GetChild(i);
+            if (ch.name == "Panel") ch.gameObject.SetActive(false);
         }
 
+        // Build our own canvas for the planet panel
+        var cGO = new GameObject("PlanetCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
+        var c = cGO.GetComponent<Canvas>();
+        c.renderMode = RenderMode.ScreenSpaceOverlay;
+        c.sortingOrder = 10;
+        var cs = cGO.GetComponent<CanvasScaler>();
+        cs.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        cs.referenceResolution = new Vector2(1920, 1080);
+        cs.matchWidthOrHeight = 0.5f;
+        var cRoot = cGO.GetComponent<RectTransform>();
+
+        // Outer panel — top-left, 300×360
+        var panel = UIRect("PlanetPanel", cRoot);
+        SetCorner(panel, new Vector2(0,1), new Vector2(0,1), new Vector2(0,1), new Vector2(20,-20), new Vector2(300, 360));
+        AddImage(panel, new Color(0.04f, 0.06f, 0.12f, 0.92f));
+
+        // Cyan top accent
+        var accent = UIRect("Accent", panel);
+        SetCorner(accent, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), Vector2.zero, new Vector2(0,3));
+        AddImage(accent, new Color(0f, 0.85f, 1f, 0.9f));
+
+        // Title
+        var titleR = UIRect("PanelTitle", panel);
+        SetCorner(titleR, new Vector2(0,1), new Vector2(1,1), new Vector2(0,1), new Vector2(12,-8), new Vector2(-12,22));
+        var titleT = titleR.gameObject.AddComponent<TextMeshProUGUI>();
+        titleT.text = "PLANET SELECT";
+        titleT.fontSize = 13; titleT.fontStyle = FontStyles.Bold;
+        titleT.color = new Color(0f, 0.85f, 1f);
+        titleT.characterSpacing = 3f;
+
+        // Dropdown re-parented
+        if (ui.dropdown != null)
+        {
+            ui.dropdown.transform.SetParent(panel, false);
+            var dRT = ui.dropdown.GetComponent<RectTransform>();
+            SetCorner(dRT, new Vector2(0,1), new Vector2(1,1), new Vector2(0,1), new Vector2(10,-36), new Vector2(-10,38));
+            StyleDropdown(ui.dropdown);
+        }
+
+        // Divider
+        var div = UIRect("Divider", panel);
+        SetCorner(div, new Vector2(0,1), new Vector2(1,1), new Vector2(0,1), new Vector2(0,-80), new Vector2(0,1));
+        AddImage(div, new Color(0f, 0.85f, 1f, 0.3f));
+
+        // Info text
         if (ui.infoText != null)
         {
-            var bg = new GameObject("InfoBG", typeof(RectTransform), typeof(Image));
-            bg.transform.SetParent(canvasRT, false);
-            AnchorRect(bg.GetComponent<RectTransform>(), new Vector2(20, -90), new Vector2(320, 200));
-            bg.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.6f);
-
-            ReparentAndAnchor(ui.infoText.transform, canvasRT, new Vector2(20, -90), new Vector2(320, 200));
+            ui.infoText.transform.SetParent(panel, false);
+            var iRT = ui.infoText.GetComponent<RectTransform>();
+            SetCorner(iRT, new Vector2(0,1), new Vector2(1,1), new Vector2(0,1), new Vector2(0,-82), new Vector2(0,220));
             ui.infoText.textWrappingMode = TextWrappingModes.Normal;
-            ui.infoText.fontSize = 22;
+            ui.infoText.fontSize = 18;
             ui.infoText.color = Color.white;
             ui.infoText.alignment = TextAlignmentOptions.TopLeft;
-            ui.infoText.margin = new Vector4(10, 10, 10, 10);
+            ui.infoText.margin = new Vector4(14, 10, 14, 0);
         }
 
-        if (ui.dropdown != null)
-            ReparentAndAnchor(ui.dropdown.transform, canvasRT, new Vector2(20, -20), new Vector2(320, 60));
+        // Divider 2
+        var div2 = UIRect("Divider2", panel);
+        SetCorner(div2, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(0,76), new Vector2(0,1));
+        AddImage(div2, new Color(0f, 0.85f, 1f, 0.3f));
 
+        // Send probe button
         if (ui.sendProbeButton != null)
         {
-            ReparentAndAnchor(ui.sendProbeButton.transform, canvasRT, new Vector2(20, -310), new Vector2(320, 60));
-            var label = ui.sendProbeButton.GetComponentInChildren<TextMeshProUGUI>();
-            if (label != null) label.text = "Send Probe Here";
-            var legacy = ui.sendProbeButton.GetComponentInChildren<Text>();
-            if (legacy != null) legacy.text = "Send Probe Here";
+            ui.sendProbeButton.transform.SetParent(panel, false);
+            var bRT = ui.sendProbeButton.GetComponent<RectTransform>();
+            SetCorner(bRT, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(12,12), new Vector2(-12,52));
+            StyleButton(ui.sendProbeButton, "SEND PROBE", new Color(0f, 0.85f, 1f));
         }
     }
 
@@ -548,159 +586,90 @@ public class SceneBootstrap : MonoBehaviour
         scaler.matchWidthOrHeight = 0.5f;
         var root = canvasGO.GetComponent<RectTransform>();
 
-        // ── Panel: bottom-right, 380×130 ──
-        var panel = MakeRect("TimeScalePanel", root);
-        panel.anchorMin = panel.anchorMax = new Vector2(1, 0);
-        panel.pivot     = new Vector2(1, 0);
-        panel.anchoredPosition = new Vector2(-24, 24);
-        panel.sizeDelta = new Vector2(380, 130);
-        var panelImg = panel.gameObject.AddComponent<Image>();
-        panelImg.color = new Color(0.04f, 0.06f, 0.12f, 0.92f);
+        // ── Panel: bottom-right, 400×120 ──
+        var panel = UIRect("TimeScalePanel", root);
+        SetCorner(panel, new Vector2(1,0), new Vector2(1,0), new Vector2(1,0), new Vector2(-20,20), new Vector2(400,120));
+        AddImage(panel, new Color(0.04f, 0.06f, 0.12f, 0.92f));
 
-        // Cyan accent bar on top
-        var accent = MakeRect("Accent", panel);
-        accent.anchorMin = Vector2.zero; accent.anchorMax = new Vector2(1, 1);
-        accent.offsetMin = Vector2.zero; accent.offsetMax = Vector2.zero;
-        accent.anchorMin = new Vector2(0, 1); accent.anchorMax = new Vector2(1, 1);
-        accent.pivot = new Vector2(0.5f, 1f);
-        accent.sizeDelta = new Vector2(0, 3);
-        accent.anchoredPosition = Vector2.zero;
-        accent.gameObject.AddComponent<Image>().color = new Color(0.0f, 0.85f, 1f, 0.9f);
+        // Top accent
+        var accent2 = UIRect("Accent", panel);
+        SetCorner(accent2, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), Vector2.zero, new Vector2(0,2));
+        AddImage(accent2, new Color(0f, 0.85f, 1f));
 
-        // ── Title row ──
-        var title = MakeRect("Title", panel);
-        title.anchorMin = new Vector2(0, 1); title.anchorMax = new Vector2(1, 1);
-        title.pivot = new Vector2(0, 1);
-        title.anchoredPosition = new Vector2(14, -8);
-        title.sizeDelta = new Vector2(-14, 22);
-        var titleTMP = title.gameObject.AddComponent<TextMeshProUGUI>();
-        titleTMP.text = "TIME CONTROL";
-        titleTMP.fontSize = 13;
-        titleTMP.color = new Color(0.0f, 0.85f, 1f);
-        titleTMP.fontStyle = FontStyles.Bold;
-        titleTMP.characterSpacing = 3f;
+        // Title (top-left)
+        var titleR2 = UIRect("Title", panel);
+        SetCorner(titleR2, new Vector2(0,1), new Vector2(0,1), new Vector2(0,1), new Vector2(12,-7), new Vector2(160,20));
+        Label(titleR2, "TIME CONTROL", 12, new Color(0f,0.85f,1f), FontStyles.Bold, 3f);
 
-        // ── Speed label (right-aligned, same row as title) ──
-        var speedLabel = MakeRect("SpeedLabel", panel);
-        speedLabel.anchorMin = new Vector2(0, 1); speedLabel.anchorMax = new Vector2(1, 1);
-        speedLabel.pivot = new Vector2(1, 1);
-        speedLabel.anchoredPosition = new Vector2(-14, -8);
-        speedLabel.sizeDelta = new Vector2(-14, 22);
-        var speedTMP = speedLabel.gameObject.AddComponent<TextMeshProUGUI>();
-        speedTMP.text = "1×";
-        speedTMP.fontSize = 15;
-        speedTMP.color = Color.white;
-        speedTMP.fontStyle = FontStyles.Bold;
+        // Speed label (top-right)
+        var speedR2 = UIRect("SpeedLabel", panel);
+        SetCorner(speedR2, new Vector2(1,1), new Vector2(1,1), new Vector2(1,1), new Vector2(-12,-7), new Vector2(100,20));
+        var speedTMP = Label(speedR2, "1x", 15, Color.white, FontStyles.Bold);
         speedTMP.alignment = TextAlignmentOptions.Right;
 
-        // ── Slider row ──
-        var sliderGO = new GameObject("TimeSlider");
-        sliderGO.transform.SetParent(panel, false);
-        var sliderRT = sliderGO.AddComponent<RectTransform>();
-        sliderRT.anchorMin = new Vector2(0, 1); sliderRT.anchorMax = new Vector2(1, 1);
-        sliderRT.pivot = new Vector2(0.5f, 1f);
-        sliderRT.anchoredPosition = new Vector2(0, -36);
-        sliderRT.sizeDelta = new Vector2(-28, 24);
-        var slider = sliderGO.AddComponent<Slider>();
+        // Slider — middle strip, proper RectTransform from creation
+        var sliderR2 = UIRect("TimeSlider", panel);
+        SetCorner(sliderR2, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), new Vector2(0,-33), new Vector2(-24, 22));
+        var slider = sliderR2.gameObject.AddComponent<Slider>();
         slider.direction = Slider.Direction.LeftToRight;
-        slider.minValue = 1f;
-        slider.maxValue = 1000f;
-        slider.value = 1f;
-        slider.wholeNumbers = true;
+        slider.minValue = 1f; slider.maxValue = 100f;
+        slider.value = 1f; slider.wholeNumbers = true;
 
-        // Track background
-        var track = MakeRect("Background", sliderRT);
-        track.anchorMin = new Vector2(0, 0.4f); track.anchorMax = new Vector2(1, 0.6f);
-        track.offsetMin = track.offsetMax = Vector2.zero;
-        var trackImg = track.gameObject.AddComponent<Image>();
-        trackImg.color = new Color(0.12f, 0.16f, 0.24f);
+        var bgR2 = UIRect("Background", sliderR2);
+        bgR2.anchorMin = new Vector2(0,0.35f); bgR2.anchorMax = new Vector2(1,0.65f);
+        bgR2.offsetMin = bgR2.offsetMax = Vector2.zero;
+        AddImage(bgR2, new Color(0.1f,0.14f,0.22f));
 
-        // Fill area
-        var fillArea = MakeRect("Fill Area", sliderRT);
-        fillArea.anchorMin = new Vector2(0, 0.4f); fillArea.anchorMax = new Vector2(1, 0.6f);
-        fillArea.offsetMin = new Vector2(0, 0); fillArea.offsetMax = new Vector2(0, 0);
+        var faR2 = UIRect("Fill Area", sliderR2);
+        faR2.anchorMin = new Vector2(0,0.35f); faR2.anchorMax = new Vector2(1,0.65f);
+        faR2.offsetMin = faR2.offsetMax = Vector2.zero;
 
-        // Fill
-        var fill = MakeRect("Fill", fillArea);
-        fill.anchorMin = Vector2.zero; fill.anchorMax = new Vector2(0, 1);
-        fill.offsetMin = fill.offsetMax = Vector2.zero;
-        var fillImg = fill.gameObject.AddComponent<Image>();
-        fillImg.color = new Color(0.0f, 0.75f, 1f);
+        var fillR2 = UIRect("Fill", faR2);
+        fillR2.anchorMin = Vector2.zero; fillR2.anchorMax = new Vector2(0,1);
+        fillR2.offsetMin = fillR2.offsetMax = Vector2.zero;
+        var fillImg2 = AddImage(fillR2, new Color(0f, 0.75f, 1f));
 
-        // Handle slide area
-        var handleArea = MakeRect("Handle Slide Area", sliderRT);
-        handleArea.anchorMin = Vector2.zero; handleArea.anchorMax = Vector2.one;
-        handleArea.offsetMin = Vector2.zero; handleArea.offsetMax = Vector2.zero;
+        var haR2 = UIRect("Handle Slide Area", sliderR2);
+        haR2.anchorMin = Vector2.zero; haR2.anchorMax = Vector2.one;
+        haR2.offsetMin = haR2.offsetMax = Vector2.zero;
 
-        // Handle
-        var handle = MakeRect("Handle", handleArea);
-        handle.anchorMin = new Vector2(0, 0); handle.anchorMax = new Vector2(0, 1);
-        handle.pivot = new Vector2(0.5f, 0.5f);
-        handle.sizeDelta = new Vector2(18, 4);
-        var handleImg = handle.gameObject.AddComponent<Image>();
-        handleImg.color = Color.white;
+        var handleR2 = UIRect("Handle", haR2);
+        handleR2.anchorMin = new Vector2(0,0); handleR2.anchorMax = new Vector2(0,1);
+        handleR2.pivot = new Vector2(0.5f,0.5f);
+        handleR2.offsetMin = new Vector2(-10,0); handleR2.offsetMax = new Vector2(10,0);
+        var handleImg2 = AddImage(handleR2, Color.white);
 
-        slider.fillRect      = fill;
-        slider.handleRect    = handle;
-        slider.targetGraphic = handleImg;
+        slider.fillRect = fillR2; slider.handleRect = handleR2; slider.targetGraphic = handleImg2;
 
-        // Tick labels: 1x and 1000x
-        var minLbl = MakeRect("MinLbl", sliderRT);
-        minLbl.anchorMin = new Vector2(0, 0); minLbl.anchorMax = new Vector2(0, 0);
-        minLbl.pivot = new Vector2(0, 1); minLbl.anchoredPosition = new Vector2(0, -2); minLbl.sizeDelta = new Vector2(40, 16);
-        var minT = minLbl.gameObject.AddComponent<TextMeshProUGUI>();
-        minT.text = "1×"; minT.fontSize = 11; minT.color = new Color(0.6f, 0.7f, 0.8f);
+        // Tick labels
+        var lbl1 = UIRect("Lbl1x", sliderR2);
+        SetCorner(lbl1, new Vector2(0,0), new Vector2(0,0), new Vector2(0,1), new Vector2(0,-2), new Vector2(30,14));
+        Label(lbl1, "1x", 10, new Color(0.55f,0.65f,0.75f));
 
-        var maxLbl = MakeRect("MaxLbl", sliderRT);
-        maxLbl.anchorMin = new Vector2(1, 0); maxLbl.anchorMax = new Vector2(1, 0);
-        maxLbl.pivot = new Vector2(1, 1); maxLbl.anchoredPosition = new Vector2(0, -2); maxLbl.sizeDelta = new Vector2(50, 16);
-        var maxT = maxLbl.gameObject.AddComponent<TextMeshProUGUI>();
-        maxT.text = "1000×"; maxT.fontSize = 11; maxT.color = new Color(0.6f, 0.7f, 0.8f);
-        maxT.alignment = TextAlignmentOptions.Right;
+        var lbl100 = UIRect("Lbl100x", sliderR2);
+        SetCorner(lbl100, new Vector2(1,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,-2), new Vector2(40,14));
+        Label(lbl100, "100x", 10, new Color(0.55f,0.65f,0.75f)).alignment = TextAlignmentOptions.Right;
 
-        // ── Pause button ──
-        var btnGO = new GameObject("PauseButton", typeof(RectTransform), typeof(Image), typeof(Button));
-        btnGO.transform.SetParent(panel, false);
-        var btnRT = btnGO.GetComponent<RectTransform>();
-        btnRT.anchorMin = new Vector2(1, 0); btnRT.anchorMax = new Vector2(1, 0);
-        btnRT.pivot = new Vector2(1, 0);
-        btnRT.anchoredPosition = new Vector2(-14, 12);
-        btnRT.sizeDelta = new Vector2(110, 36);
-        var btnImg = btnGO.GetComponent<Image>();
-        btnImg.color = new Color(0.06f, 0.18f, 0.32f);
-        var btn = btnGO.GetComponent<Button>();
-        var btnColors = btn.colors;
-        btnColors.normalColor      = new Color(0.06f, 0.18f, 0.32f);
-        btnColors.highlightedColor = new Color(0.10f, 0.30f, 0.55f);
-        btnColors.pressedColor     = new Color(0.02f, 0.10f, 0.22f);
-        btn.colors = btnColors;
-        btn.targetGraphic = btnImg;
+        // Pause button (bottom-right of panel)
+        var btnR2 = UIRect("PauseButton", panel);
+        SetCorner(btnR2, new Vector2(1,0), new Vector2(1,0), new Vector2(1,0), new Vector2(-12,10), new Vector2(120,40));
+        var btnImg2 = AddImage(btnR2, new Color(0.05f,0.15f,0.28f));
+        var btn = btnR2.gameObject.AddComponent<Button>();
+        var bc2 = btn.colors;
+        bc2.normalColor = new Color(0.05f,0.15f,0.28f);
+        bc2.highlightedColor = new Color(0.1f,0.28f,0.5f);
+        bc2.pressedColor = new Color(0.02f,0.08f,0.18f);
+        btn.colors = bc2; btn.targetGraphic = btnImg2;
 
-        var btnTextGO = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
-        btnTextGO.transform.SetParent(btnGO.transform, false);
-        var btnTextRT = btnTextGO.GetComponent<RectTransform>();
-        btnTextRT.anchorMin = Vector2.zero; btnTextRT.anchorMax = Vector2.one;
-        btnTextRT.offsetMin = btnTextRT.offsetMax = Vector2.zero;
-        var btnTMP = btnTextGO.GetComponent<TextMeshProUGUI>();
-        btnTMP.text = "⏸  PAUSE";
-        btnTMP.fontSize = 14;
-        btnTMP.color = new Color(0.0f, 0.85f, 1f);
-        btnTMP.fontStyle = FontStyles.Bold;
+        var btnTextR2 = UIRect("Text", btnR2);
+        btnTextR2.anchorMin = Vector2.zero; btnTextR2.anchorMax = Vector2.one;
+        btnTextR2.offsetMin = btnTextR2.offsetMax = Vector2.zero;
+        var btnTMP = Label(btnTextR2, "|| PAUSE", 14, new Color(0f,0.85f,1f), FontStyles.Bold);
         btnTMP.alignment = TextAlignmentOptions.Center;
 
-        // ── Wire TimeScaleController ──
         var ctrl = canvasGO.AddComponent<TimeScaleController>();
-        ctrl.timeSlider      = slider;
-        ctrl.pauseButton     = btn;
-        ctrl.speedLabel      = speedTMP;
-        ctrl.pauseButtonText = btnTMP;
-    }
-
-    static RectTransform MakeRect(string name, Transform parent)
-    {
-        var go = new GameObject(name, typeof(RectTransform));
-        go.transform.SetParent(parent, false);
-        return go.GetComponent<RectTransform>();
+        ctrl.timeSlider = slider; ctrl.pauseButton = btn;
+        ctrl.speedLabel = speedTMP; ctrl.pauseButtonText = btnTMP;
     }
 
     static void ReparentAndAnchor(Transform t, Transform newParent, Vector2 pos, Vector2 size)

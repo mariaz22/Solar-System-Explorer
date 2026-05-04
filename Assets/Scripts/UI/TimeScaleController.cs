@@ -15,7 +15,7 @@ public class TimeScaleController : MonoBehaviour
     void Start()
     {
         timeSlider.minValue = 1f;
-        timeSlider.maxValue = 1000f;
+        timeSlider.maxValue = 100f;
         timeSlider.value = 1f;
         Time.timeScale = 1f;
 
@@ -42,7 +42,7 @@ public class TimeScaleController : MonoBehaviour
         if (isPaused)
         {
             Time.timeScale = 0f;
-            pauseButtonText.text = "▶  RESUME";
+            pauseButtonText.text = "> RESUME";
             pauseButtonText.color = new Color(0.2f, 1f, 0.4f);
         }
         else
@@ -50,7 +50,7 @@ public class TimeScaleController : MonoBehaviour
             float value = timeSlider.value;
             Time.timeScale = value;
             Time.fixedDeltaTime = 0.02f * value;
-            pauseButtonText.text = "⏸  PAUSE";
+            pauseButtonText.text = "|| PAUSE";
             pauseButtonText.color = new Color(0.0f, 0.85f, 1f);
         }
         UpdateLabel(timeSlider.value);
@@ -59,9 +59,7 @@ public class TimeScaleController : MonoBehaviour
     void UpdateLabel(float scale)
     {
         int rounded = Mathf.RoundToInt(scale);
-        speedLabel.text = isPaused
-            ? $"{rounded}× <color=#888888>PAUSED</color>"
-            : $"{rounded}×";
+        speedLabel.text = isPaused ? $"{rounded}x PAUSED" : $"{rounded}x";
     }
 
     void OnDestroy()
