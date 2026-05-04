@@ -10,7 +10,7 @@ public class TimeScaleController : MonoBehaviour
     public TMP_Text speedLabel;
     public TMP_Text pauseButtonText;
 
-    private bool isPaused = false;
+    bool isPaused = false;
 
     void Start()
     {
@@ -31,12 +31,8 @@ public class TimeScaleController : MonoBehaviour
         {
             Time.timeScale = value;
             Time.fixedDeltaTime = 0.02f * value;
-            UpdateLabel(value);
         }
-        else
-        {
-            speedLabel.text = $"Speed: {Mathf.RoundToInt(value)}x (paused)";
-        }
+        UpdateLabel(value);
     }
 
     void TogglePause()
@@ -46,22 +42,26 @@ public class TimeScaleController : MonoBehaviour
         if (isPaused)
         {
             Time.timeScale = 0f;
-            pauseButtonText.text = "Resume";
-            speedLabel.text = $"Speed: {Mathf.RoundToInt(timeSlider.value)}x (paused)";
+            pauseButtonText.text = "▶  RESUME";
+            pauseButtonText.color = new Color(0.2f, 1f, 0.4f);
         }
         else
         {
             float value = timeSlider.value;
             Time.timeScale = value;
             Time.fixedDeltaTime = 0.02f * value;
-            pauseButtonText.text = "Pause";
-            UpdateLabel(value);
+            pauseButtonText.text = "⏸  PAUSE";
+            pauseButtonText.color = new Color(0.0f, 0.85f, 1f);
         }
+        UpdateLabel(timeSlider.value);
     }
 
     void UpdateLabel(float scale)
     {
-        speedLabel.text = $"Speed: {Mathf.RoundToInt(scale)}x";
+        int rounded = Mathf.RoundToInt(scale);
+        speedLabel.text = isPaused
+            ? $"{rounded}× <color=#888888>PAUSED</color>"
+            : $"{rounded}×";
     }
 
     void OnDestroy()

@@ -541,94 +541,140 @@ public class SceneBootstrap : MonoBehaviour
             typeof(Canvas), typeof(CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
         var canvas = canvasGO.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
-        canvas.sortingOrder = 10;
+        canvas.sortingOrder = 20;
         var scaler = canvasGO.GetComponent<CanvasScaler>();
         scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
         scaler.referenceResolution = new Vector2(1920, 1080);
         scaler.matchWidthOrHeight = 0.5f;
-        var canvasRT = canvasGO.GetComponent<RectTransform>();
+        var root = canvasGO.GetComponent<RectTransform>();
 
-        // Panel background — bottom-right corner
-        var panelGO = new GameObject("TimeScalePanel", typeof(RectTransform), typeof(Image));
-        panelGO.transform.SetParent(canvasRT, false);
-        var panelRT = panelGO.GetComponent<RectTransform>();
-        panelRT.anchorMin = new Vector2(1, 0);
-        panelRT.anchorMax = new Vector2(1, 0);
-        panelRT.pivot     = new Vector2(1, 0);
-        panelRT.anchoredPosition = new Vector2(-20, 20);
-        panelRT.sizeDelta = new Vector2(340, 110);
-        panelGO.GetComponent<Image>().color = new Color(0f, 0f, 0f, 0.65f);
+        // ── Panel: bottom-right, 380×130 ──
+        var panel = MakeRect("TimeScalePanel", root);
+        panel.anchorMin = panel.anchorMax = new Vector2(1, 0);
+        panel.pivot     = new Vector2(1, 0);
+        panel.anchoredPosition = new Vector2(-24, 24);
+        panel.sizeDelta = new Vector2(380, 130);
+        var panelImg = panel.gameObject.AddComponent<Image>();
+        panelImg.color = new Color(0.04f, 0.06f, 0.12f, 0.92f);
 
-        // Speed label
-        var labelGO = new GameObject("SpeedLabel", typeof(RectTransform), typeof(TextMeshProUGUI));
-        labelGO.transform.SetParent(panelGO.transform, false);
-        var labelRT = labelGO.GetComponent<RectTransform>();
-        labelRT.anchorMin = Vector2.zero; labelRT.anchorMax = Vector2.one;
-        labelRT.offsetMin = new Vector2(10, 68); labelRT.offsetMax = new Vector2(-10, -6);
-        var labelTMP = labelGO.GetComponent<TextMeshProUGUI>();
-        labelTMP.text = "Speed: 1x";
-        labelTMP.fontSize = 20;
-        labelTMP.color = Color.white;
-        labelTMP.alignment = TextAlignmentOptions.Left;
+        // Cyan accent bar on top
+        var accent = MakeRect("Accent", panel);
+        accent.anchorMin = Vector2.zero; accent.anchorMax = new Vector2(1, 1);
+        accent.offsetMin = Vector2.zero; accent.offsetMax = Vector2.zero;
+        accent.anchorMin = new Vector2(0, 1); accent.anchorMax = new Vector2(1, 1);
+        accent.pivot = new Vector2(0.5f, 1f);
+        accent.sizeDelta = new Vector2(0, 3);
+        accent.anchoredPosition = Vector2.zero;
+        accent.gameObject.AddComponent<Image>().color = new Color(0.0f, 0.85f, 1f, 0.9f);
 
-        // Slider
+        // ── Title row ──
+        var title = MakeRect("Title", panel);
+        title.anchorMin = new Vector2(0, 1); title.anchorMax = new Vector2(1, 1);
+        title.pivot = new Vector2(0, 1);
+        title.anchoredPosition = new Vector2(14, -8);
+        title.sizeDelta = new Vector2(-14, 22);
+        var titleTMP = title.gameObject.AddComponent<TextMeshProUGUI>();
+        titleTMP.text = "TIME CONTROL";
+        titleTMP.fontSize = 13;
+        titleTMP.color = new Color(0.0f, 0.85f, 1f);
+        titleTMP.fontStyle = FontStyles.Bold;
+        titleTMP.characterSpacing = 3f;
+
+        // ── Speed label (right-aligned, same row as title) ──
+        var speedLabel = MakeRect("SpeedLabel", panel);
+        speedLabel.anchorMin = new Vector2(0, 1); speedLabel.anchorMax = new Vector2(1, 1);
+        speedLabel.pivot = new Vector2(1, 1);
+        speedLabel.anchoredPosition = new Vector2(-14, -8);
+        speedLabel.sizeDelta = new Vector2(-14, 22);
+        var speedTMP = speedLabel.gameObject.AddComponent<TextMeshProUGUI>();
+        speedTMP.text = "1×";
+        speedTMP.fontSize = 15;
+        speedTMP.color = Color.white;
+        speedTMP.fontStyle = FontStyles.Bold;
+        speedTMP.alignment = TextAlignmentOptions.Right;
+
+        // ── Slider row ──
         var sliderGO = new GameObject("TimeSlider");
-        sliderGO.transform.SetParent(panelGO.transform, false);
+        sliderGO.transform.SetParent(panel, false);
         var sliderRT = sliderGO.AddComponent<RectTransform>();
-        sliderRT.anchorMin = Vector2.zero; sliderRT.anchorMax = Vector2.one;
-        sliderRT.offsetMin = new Vector2(10, 38); sliderRT.offsetMax = new Vector2(-120, -70);
+        sliderRT.anchorMin = new Vector2(0, 1); sliderRT.anchorMax = new Vector2(1, 1);
+        sliderRT.pivot = new Vector2(0.5f, 1f);
+        sliderRT.anchoredPosition = new Vector2(0, -36);
+        sliderRT.sizeDelta = new Vector2(-28, 24);
         var slider = sliderGO.AddComponent<Slider>();
+        slider.direction = Slider.Direction.LeftToRight;
+        slider.minValue = 1f;
+        slider.maxValue = 1000f;
+        slider.value = 1f;
+        slider.wholeNumbers = true;
 
-        var bgGO = new GameObject("Background", typeof(RectTransform), typeof(Image));
-        bgGO.transform.SetParent(sliderGO.transform, false);
-        var bgImg = bgGO.GetComponent<Image>();
-        bgImg.color = new Color(0.2f, 0.2f, 0.2f);
-        var bgRT = bgGO.GetComponent<RectTransform>();
-        bgRT.anchorMin = new Vector2(0, 0.25f); bgRT.anchorMax = new Vector2(1, 0.75f);
-        bgRT.offsetMin = bgRT.offsetMax = Vector2.zero;
+        // Track background
+        var track = MakeRect("Background", sliderRT);
+        track.anchorMin = new Vector2(0, 0.4f); track.anchorMax = new Vector2(1, 0.6f);
+        track.offsetMin = track.offsetMax = Vector2.zero;
+        var trackImg = track.gameObject.AddComponent<Image>();
+        trackImg.color = new Color(0.12f, 0.16f, 0.24f);
 
-        var fillAreaGO = new GameObject("Fill Area", typeof(RectTransform));
-        fillAreaGO.transform.SetParent(sliderGO.transform, false);
-        var faRT = fillAreaGO.GetComponent<RectTransform>();
-        faRT.anchorMin = new Vector2(0, 0.25f); faRT.anchorMax = new Vector2(1, 0.75f);
-        faRT.offsetMin = new Vector2(5, 0); faRT.offsetMax = new Vector2(-5, 0);
+        // Fill area
+        var fillArea = MakeRect("Fill Area", sliderRT);
+        fillArea.anchorMin = new Vector2(0, 0.4f); fillArea.anchorMax = new Vector2(1, 0.6f);
+        fillArea.offsetMin = new Vector2(0, 0); fillArea.offsetMax = new Vector2(0, 0);
 
-        var fillGO = new GameObject("Fill", typeof(RectTransform), typeof(Image));
-        fillGO.transform.SetParent(fillAreaGO.transform, false);
-        fillGO.GetComponent<Image>().color = new Color(0.2f, 0.7f, 1f);
-        var fillRT = fillGO.GetComponent<RectTransform>();
-        fillRT.anchorMin = Vector2.zero; fillRT.anchorMax = Vector2.one;
-        fillRT.offsetMin = fillRT.offsetMax = Vector2.zero;
+        // Fill
+        var fill = MakeRect("Fill", fillArea);
+        fill.anchorMin = Vector2.zero; fill.anchorMax = new Vector2(0, 1);
+        fill.offsetMin = fill.offsetMax = Vector2.zero;
+        var fillImg = fill.gameObject.AddComponent<Image>();
+        fillImg.color = new Color(0.0f, 0.75f, 1f);
 
-        var handleAreaGO = new GameObject("Handle Slide Area", typeof(RectTransform));
-        handleAreaGO.transform.SetParent(sliderGO.transform, false);
-        var haRT = handleAreaGO.GetComponent<RectTransform>();
-        haRT.anchorMin = Vector2.zero; haRT.anchorMax = Vector2.one;
-        haRT.offsetMin = new Vector2(10, 0); haRT.offsetMax = new Vector2(-10, 0);
+        // Handle slide area
+        var handleArea = MakeRect("Handle Slide Area", sliderRT);
+        handleArea.anchorMin = Vector2.zero; handleArea.anchorMax = Vector2.one;
+        handleArea.offsetMin = Vector2.zero; handleArea.offsetMax = Vector2.zero;
 
-        var handleGO = new GameObject("Handle", typeof(RectTransform), typeof(Image));
-        handleGO.transform.SetParent(handleAreaGO.transform, false);
-        handleGO.GetComponent<Image>().color = Color.white;
-        var handleRT = handleGO.GetComponent<RectTransform>();
-        handleRT.sizeDelta = new Vector2(20, 0);
-        handleRT.anchorMin = new Vector2(0, 0); handleRT.anchorMax = new Vector2(0, 1);
+        // Handle
+        var handle = MakeRect("Handle", handleArea);
+        handle.anchorMin = new Vector2(0, 0); handle.anchorMax = new Vector2(0, 1);
+        handle.pivot = new Vector2(0.5f, 0.5f);
+        handle.sizeDelta = new Vector2(18, 4);
+        var handleImg = handle.gameObject.AddComponent<Image>();
+        handleImg.color = Color.white;
 
-        slider.fillRect    = fillGO.GetComponent<RectTransform>();
-        slider.handleRect  = handleGO.GetComponent<RectTransform>();
-        slider.targetGraphic = handleGO.GetComponent<Image>();
-        slider.direction   = Slider.Direction.LeftToRight;
+        slider.fillRect      = fill;
+        slider.handleRect    = handle;
+        slider.targetGraphic = handleImg;
 
-        // Pause button
+        // Tick labels: 1x and 1000x
+        var minLbl = MakeRect("MinLbl", sliderRT);
+        minLbl.anchorMin = new Vector2(0, 0); minLbl.anchorMax = new Vector2(0, 0);
+        minLbl.pivot = new Vector2(0, 1); minLbl.anchoredPosition = new Vector2(0, -2); minLbl.sizeDelta = new Vector2(40, 16);
+        var minT = minLbl.gameObject.AddComponent<TextMeshProUGUI>();
+        minT.text = "1×"; minT.fontSize = 11; minT.color = new Color(0.6f, 0.7f, 0.8f);
+
+        var maxLbl = MakeRect("MaxLbl", sliderRT);
+        maxLbl.anchorMin = new Vector2(1, 0); maxLbl.anchorMax = new Vector2(1, 0);
+        maxLbl.pivot = new Vector2(1, 1); maxLbl.anchoredPosition = new Vector2(0, -2); maxLbl.sizeDelta = new Vector2(50, 16);
+        var maxT = maxLbl.gameObject.AddComponent<TextMeshProUGUI>();
+        maxT.text = "1000×"; maxT.fontSize = 11; maxT.color = new Color(0.6f, 0.7f, 0.8f);
+        maxT.alignment = TextAlignmentOptions.Right;
+
+        // ── Pause button ──
         var btnGO = new GameObject("PauseButton", typeof(RectTransform), typeof(Image), typeof(Button));
-        btnGO.transform.SetParent(panelGO.transform, false);
+        btnGO.transform.SetParent(panel, false);
         var btnRT = btnGO.GetComponent<RectTransform>();
-        btnRT.anchorMin = Vector2.zero; btnRT.anchorMax = Vector2.one;
-        btnRT.offsetMin = new Vector2(228, 34); btnRT.offsetMax = new Vector2(-8, -68);
-        btnGO.GetComponent<Image>().color = new Color(0.25f, 0.25f, 0.35f);
+        btnRT.anchorMin = new Vector2(1, 0); btnRT.anchorMax = new Vector2(1, 0);
+        btnRT.pivot = new Vector2(1, 0);
+        btnRT.anchoredPosition = new Vector2(-14, 12);
+        btnRT.sizeDelta = new Vector2(110, 36);
+        var btnImg = btnGO.GetComponent<Image>();
+        btnImg.color = new Color(0.06f, 0.18f, 0.32f);
         var btn = btnGO.GetComponent<Button>();
-        var colors = btn.colors;
-        colors.highlightedColor = new Color(0.35f, 0.35f, 0.55f);
-        btn.colors = colors;
+        var btnColors = btn.colors;
+        btnColors.normalColor      = new Color(0.06f, 0.18f, 0.32f);
+        btnColors.highlightedColor = new Color(0.10f, 0.30f, 0.55f);
+        btnColors.pressedColor     = new Color(0.02f, 0.10f, 0.22f);
+        btn.colors = btnColors;
+        btn.targetGraphic = btnImg;
 
         var btnTextGO = new GameObject("Text", typeof(RectTransform), typeof(TextMeshProUGUI));
         btnTextGO.transform.SetParent(btnGO.transform, false);
@@ -636,17 +682,25 @@ public class SceneBootstrap : MonoBehaviour
         btnTextRT.anchorMin = Vector2.zero; btnTextRT.anchorMax = Vector2.one;
         btnTextRT.offsetMin = btnTextRT.offsetMax = Vector2.zero;
         var btnTMP = btnTextGO.GetComponent<TextMeshProUGUI>();
-        btnTMP.text = "Pause";
-        btnTMP.fontSize = 18;
-        btnTMP.color = Color.white;
+        btnTMP.text = "⏸  PAUSE";
+        btnTMP.fontSize = 14;
+        btnTMP.color = new Color(0.0f, 0.85f, 1f);
+        btnTMP.fontStyle = FontStyles.Bold;
         btnTMP.alignment = TextAlignmentOptions.Center;
 
-        // Wire up TimeScaleController
+        // ── Wire TimeScaleController ──
         var ctrl = canvasGO.AddComponent<TimeScaleController>();
         ctrl.timeSlider      = slider;
         ctrl.pauseButton     = btn;
-        ctrl.speedLabel      = labelTMP;
+        ctrl.speedLabel      = speedTMP;
         ctrl.pauseButtonText = btnTMP;
+    }
+
+    static RectTransform MakeRect(string name, Transform parent)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        return go.GetComponent<RectTransform>();
     }
 
     static void ReparentAndAnchor(Transform t, Transform newParent, Vector2 pos, Vector2 size)
