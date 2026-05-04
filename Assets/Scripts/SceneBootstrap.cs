@@ -501,6 +501,9 @@ public class SceneBootstrap : MonoBehaviour
 
         // ── Time Scale UI ──
         CreateTimeScaleUI();
+
+        // ── Controls Overlay ──
+        CreateControlsOverlay();
     }
 
     void StylePlanetPanel()
@@ -687,6 +690,14 @@ public class SceneBootstrap : MonoBehaviour
         var ctrl = canvasGO.AddComponent<TimeScaleController>();
         ctrl.timeSlider = slider; ctrl.pauseButton = btn;
         ctrl.speedLabel = speedTMP; ctrl.pauseButtonText = btnTMP;
+    }
+
+    void CreateControlsOverlay()
+    {
+        var go = new GameObject("ControlsOverlay",
+            typeof(Canvas), typeof(CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
+        var overlay = go.AddComponent<ControlsOverlay>();
+        overlay.Setup();
     }
 
     static void ReparentAndAnchor(Transform t, Transform newParent, Vector2 pos, Vector2 size)

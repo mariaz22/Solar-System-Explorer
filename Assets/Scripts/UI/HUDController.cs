@@ -47,6 +47,7 @@ public class HUDController : MonoBehaviour
         BuildTopBanner(root);
         BuildTimer(root);
         BuildControlsHint(root);
+        BuildHelpButton(root);
     }
 
     void BuildBottomBar(RectTransform root)
@@ -156,6 +157,27 @@ public class HUDController : MonoBehaviour
 
         var t = Lbl("Txt", hint, "RMB: Look  ·  WASD/QE: Fly  ·  Click: Select Planet", 10, new Color(0.4f, 0.5f, 0.65f, 0.85f));
         t.characterSpacing = 0.3f;
+    }
+
+    void BuildHelpButton(RectTransform root)
+    {
+        var btnR = Panel("HelpBtn", root, new Color(0.04f, 0.08f, 0.18f, 0.90f));
+        btnR.anchorMin = new Vector2(1, 1); btnR.anchorMax = new Vector2(1, 1);
+        btnR.pivot = new Vector2(1, 1); btnR.anchoredPosition = new Vector2(-166, 0);
+        btnR.sizeDelta = new Vector2(36, 36);
+
+        var img = btnR.GetComponent<Image>();
+        var btn = btnR.gameObject.AddComponent<UnityEngine.UI.Button>();
+        btn.targetGraphic = img;
+        var bc = btn.colors;
+        bc.normalColor      = new Color(0.04f, 0.08f, 0.18f, 0.90f);
+        bc.highlightedColor = new Color(0.10f, 0.22f, 0.48f);
+        bc.pressedColor     = new Color(0.02f, 0.05f, 0.12f);
+        btn.colors = bc;
+        btn.onClick.AddListener(() => ControlsOverlay.Instance?.Toggle());
+
+        var lbl = Lbl("?", btnR, "?", 20, new Color(0.25f, 0.70f, 1f));
+        lbl.fontStyle = FontStyles.Bold;
     }
 
     void Update()
