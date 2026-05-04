@@ -1,3 +1,8 @@
+# Claude Code
+.claude/
+Assets/Resources/BillingMode.json
+Assets/Resources/BillingMode.json.meta
+
 # This .gitignore file should be placed at the root of your Unity project directory
 #
 # Get latest from https://github.com/github/gitignore/blob/main/Unity.gitignore
