@@ -453,6 +453,24 @@ public class SceneBootstrap : MonoBehaviour
 
     void ConfigureUI()
     {
+        // ── Destroy any existing TimeScaleController from the scene ──
+        foreach (var old in Object.FindObjectsByType<TimeScaleController>(FindObjectsInactive.Include))
+            Destroy(old.gameObject.GetComponent<Canvas>() != null ? old.gameObject : old.transform.parent?.gameObject ?? old.gameObject);
+
+        // ── Destroy all children of every existing Canvas that are not PlanetSelectionUI ──
+        foreach (var existingCanvas in Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include))
+        {
+            if (existingCanvas.GetComponent<PlanetSelectionUI>() != null) continue;
+            if (existingCanvas.GetComponentInChildren<PlanetSelectionUI>() != null) continue;
+            var rt = existingCanvas.GetComponent<RectTransform>();
+            for (int i = rt.childCount - 1; i >= 0; i--)
+            {
+                var ch = rt.GetChild(i);
+                if (ch.GetComponent<PlanetSelectionUI>() == null)
+                    Destroy(ch.gameObject);
+            }
+        }
+
         // ── EventSystem (if not already present) ──
         if (Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
         {
