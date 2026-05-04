@@ -690,4 +690,57 @@ public class SceneBootstrap : MonoBehaviour
         rt.localScale = Vector3.one;
         rt.localRotation = Quaternion.identity;
     }
+
+    // ── UI build helpers ─────────────────────────────────────────
+
+    static RectTransform UIRect(string name, Transform parent)
+    {
+        var go = new GameObject(name, typeof(RectTransform));
+        go.transform.SetParent(parent, false);
+        return go.GetComponent<RectTransform>();
+    }
+
+    static void SetCorner(RectTransform rt, Vector2 anchorMin, Vector2 anchorMax, Vector2 pivot, Vector2 pos, Vector2 size)
+    {
+        rt.anchorMin = anchorMin; rt.anchorMax = anchorMax;
+        rt.pivot = pivot;
+        rt.anchoredPosition = pos;
+        rt.sizeDelta = size;
+    }
+
+    static Image AddImage(RectTransform rt, Color color)
+    {
+        var img = rt.gameObject.AddComponent<Image>();
+        img.color = color;
+        return img;
+    }
+
+    static TextMeshProUGUI Label(RectTransform rt, string text, float size, Color color,
+        FontStyles style = FontStyles.Normal, float charSpacing = 0f)
+    {
+        var tmp = rt.gameObject.AddComponent<TextMeshProUGUI>();
+        tmp.text = text; tmp.fontSize = size; tmp.color = color;
+        tmp.fontStyle = style; tmp.characterSpacing = charSpacing;
+        return tmp;
+    }
+
+    static void StyleDropdown(TMPro.TMP_Dropdown dd)
+    {
+        var img = dd.GetComponent<Image>();
+        if (img) img.color = new Color(0.06f, 0.1f, 0.18f);
+        if (dd.captionText) { dd.captionText.color = Color.white; dd.captionText.fontSize = 16; }
+    }
+
+    static void StyleButton(Button btn, string text, Color accentColor)
+    {
+        var img = btn.GetComponent<Image>();
+        if (img) img.color = new Color(0.04f, 0.1f, 0.2f);
+        var bc = btn.colors;
+        bc.normalColor = new Color(0.04f, 0.1f, 0.2f);
+        bc.highlightedColor = new Color(0.08f, 0.22f, 0.42f);
+        bc.pressedColor = new Color(0.02f, 0.06f, 0.14f);
+        btn.colors = bc; btn.targetGraphic = img;
+        var lbl = btn.GetComponentInChildren<TextMeshProUGUI>();
+        if (lbl) { lbl.text = text; lbl.color = accentColor; lbl.fontStyle = FontStyles.Bold; lbl.fontSize = 16; lbl.alignment = TextAlignmentOptions.Center; }
+    }
 }
