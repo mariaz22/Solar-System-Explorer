@@ -453,20 +453,19 @@ public class SceneBootstrap : MonoBehaviour
 
     void ConfigureUI()
     {
-        // ── Destroy any existing TimeScaleController from the scene ──
+        // ── Destroy any existing TimeScaleController GameObjects from scene ──
         foreach (var old in Object.FindObjectsByType<TimeScaleController>(FindObjectsInactive.Include))
-            Destroy(old.gameObject.GetComponent<Canvas>() != null ? old.gameObject : old.transform.parent?.gameObject ?? old.gameObject);
+            Destroy(old.gameObject);
 
-        // ── Destroy all children of every existing Canvas that are not PlanetSelectionUI ──
-        foreach (var existingCanvas in Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include))
+        // ── Clean every scene Canvas: destroy children that have no PlanetSelectionUI ──
+        foreach (var cv in Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include))
         {
-            if (existingCanvas.GetComponent<PlanetSelectionUI>() != null) continue;
-            if (existingCanvas.GetComponentInChildren<PlanetSelectionUI>() != null) continue;
-            var rt = existingCanvas.GetComponent<RectTransform>();
+            var rt = cv.GetComponent<RectTransform>();
             for (int i = rt.childCount - 1; i >= 0; i--)
             {
                 var ch = rt.GetChild(i);
-                if (ch.GetComponent<PlanetSelectionUI>() == null)
+                if (ch.GetComponent<PlanetSelectionUI>() == null &&
+                    ch.GetComponentInChildren<PlanetSelectionUI>(true) == null)
                     Destroy(ch.gameObject);
             }
         }
@@ -606,7 +605,7 @@ public class SceneBootstrap : MonoBehaviour
 
         // ── Panel: bottom-right, 400×120 ──
         var panel = UIRect("TimeScalePanel", root);
-        SetCorner(panel, new Vector2(1,0), new Vector2(1,0), new Vector2(1,0), new Vector2(-20,20), new Vector2(400,120));
+        SetCorner(panel, new Vector2(1,0), new Vector2(1,0), new Vector2(1,0), new Vector2(-20,80), new Vector2(400,120));
         AddImage(panel, new Color(0.04f, 0.06f, 0.12f, 0.92f));
 
         // Top accent
