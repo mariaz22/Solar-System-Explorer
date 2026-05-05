@@ -15,14 +15,24 @@ public class HUDController : MonoBehaviour
     string prevState;
     float pulseT;
 
+    // Event notification
+    Image notifBg;
+    TextMeshProUGUI notifText;
+    float notifTimer;
+
+    // Screen flash
+    Image flashOverlay;
+    float flashTimer;
+
     static readonly (System.Type t, string text, Color col)[] StateMap =
     {
         (typeof(IdleState),           "*   STANDBY",    new Color(0.55f, 0.55f, 0.65f)),
         (typeof(ChooseTargetState),   "o   COMPUTING",  new Color(1.00f, 0.80f, 0.00f)),
         (typeof(TravelState),         ">>  IN TRANSIT", new Color(0.20f, 0.80f, 1.00f)),
         (typeof(ScanState),           "+   SCANNING",   new Color(0.00f, 1.00f, 0.50f)),
-        (typeof(AvoidCollisionState), "!   AVOIDING",   new Color(1.00f, 0.30f, 0.20f)),
-        (typeof(ReturnState),         "<<  RETURNING",  new Color(0.80f, 0.40f, 1.00f)),
+        (typeof(AvoidCollisionState),  "!   AVOIDING",   new Color(1.00f, 0.30f, 0.20f)),
+        (typeof(ReturnState),          "<<  RETURNING",  new Color(0.80f, 0.40f, 1.00f)),
+        (typeof(ManualControlState),   ">_  MANUAL",     new Color(1.00f, 0.90f, 0.10f)),
     };
 
     public void Setup(ProbeController probeController)
@@ -47,6 +57,8 @@ public class HUDController : MonoBehaviour
         BuildTopBanner(root);
         BuildTimer(root);
         BuildControlsHint(root);
+        BuildNotificationArea(root);
+        BuildScreenFlash(root);
     }
 
     void BuildBottomBar(RectTransform root)
@@ -148,18 +160,21 @@ public class HUDController : MonoBehaviour
     {
         var hint = Panel("Hint", root, new Color(0.03f, 0.06f, 0.12f, 0.75f));
         hint.anchorMin = new Vector2(1, 0); hint.anchorMax = new Vector2(1, 0);
-        hint.pivot = new Vector2(1, 0); hint.anchoredPosition = new Vector2(0, 72); hint.sizeDelta = new Vector2(330, 26);
+        hint.pivot = new Vector2(1, 0); hint.anchoredPosition = new Vector2(0, 72); hint.sizeDelta = new Vector2(430, 26);
 
         var line = Panel("Line", hint, new Color(0.2f, 0.5f, 1f, 0.25f));
         line.anchorMin = new Vector2(0, 1); line.anchorMax = new Vector2(1, 1);
         line.pivot = new Vector2(0.5f, 1); line.anchoredPosition = Vector2.zero; line.sizeDelta = new Vector2(0, 1);
 
-        var t = Lbl("Txt", hint, "RMB: Look  ·  WASD/QE: Fly  ·  Click: Select Planet", 10, new Color(0.4f, 0.5f, 0.65f, 0.85f));
+        var t = Lbl("Txt", hint, "WASD/QE: Fly probe  ·  SHIFT: Boost  ·  TAB: Standby  ·  RMB: Camera", 10, new Color(0.4f, 0.5f, 0.65f, 0.85f));
         t.characterSpacing = 0.3f;
     }
 
     void Update()
     {
+        // Always update events regardless of probe state
+        UpdateEvents();
+
         if (probe?.FSM == null) return;
         elapsed += Time.deltaTime;
         UpdateState();
@@ -211,6 +226,70 @@ public class HUDController : MonoBehaviour
         if (timerLabel == null) return;
         int h = (int)(elapsed / 3600), m = (int)(elapsed % 3600 / 60), s = (int)(elapsed % 60);
         timerLabel.text = $"T+  {h:00}:{m:00}:{s:00}";
+    }
+
+    void UpdateEvents()
+    {
+        // Fade notification out
+        if (notifTimer > 0f)
+        {
+            notifTimer -= Time.deltaTime;
+            float a = Mathf.Clamp01(notifTimer);
+            if (notifBg != null)   { var c = notifBg.color;   notifBg.color   = new Color(c.r, c.g, c.b, a * 0.88f); }
+            if (notifText != null) { var c = notifText.color; notifText.color = new Color(c.r, c.g, c.b, a); }
+        }
+
+        // Fade screen flash out
+        if (flashTimer > 0f)
+        {
+            flashTimer -= Time.deltaTime * 2.5f;
+            if (flashOverlay != null)
+                flashOverlay.color = new Color(flashOverlay.color.r, flashOverlay.color.g,
+                    flashOverlay.color.b, Mathf.Clamp01(flashTimer) * 0.45f);
+        }
+    }
+
+    void BuildNotificationArea(RectTransform root)
+    {
+        var notif = Panel("Notification", root, new Color(0.05f, 0.05f, 0.10f, 0f));
+        notif.anchorMin = new Vector2(0.5f, 1f); notif.anchorMax = new Vector2(0.5f, 1f);
+        notif.pivot = new Vector2(0.5f, 1f);
+        notif.anchoredPosition = new Vector2(0f, -42f);
+        notif.sizeDelta = new Vector2(600f, 36f);
+        notifBg = notif.GetComponent<Image>();
+        if (notifBg == null) notifBg = notif.gameObject.AddComponent<Image>();
+        notifBg.color = new Color(0.05f, 0.05f, 0.10f, 0f);
+
+        notifText = Lbl("NotifTxt", notif, "", 14f, new Color(1f, 1f, 1f, 0f));
+        notifText.fontStyle = FontStyles.Bold;
+        notifText.characterSpacing = 1.5f;
+    }
+
+    void BuildScreenFlash(RectTransform root)
+    {
+        var flash = Panel("ScreenFlash", root, Color.clear);
+        flash.anchorMin = Vector2.zero; flash.anchorMax = Vector2.one;
+        flash.offsetMin = flash.offsetMax = Vector2.zero;
+        flashOverlay = flash.GetComponent<Image>();
+        if (flashOverlay == null) flashOverlay = flash.gameObject.AddComponent<Image>();
+        flashOverlay.color = Color.clear;
+        flashOverlay.raycastTarget = false;
+    }
+
+    public void ShowNotification(string message, Color color, float duration = 4f)
+    {
+        if (notifText == null || notifBg == null) return;
+        notifText.text = message;
+        notifText.color = color;
+        notifBg.color = new Color(color.r * 0.12f, color.g * 0.12f, color.b * 0.12f, 0.88f);
+        notifTimer = duration;
+    }
+
+    public void FlashScreen(Color color)
+    {
+        if (flashOverlay == null) return;
+        flashOverlay.color = new Color(color.r, color.g, color.b, 0.45f);
+        flashTimer = 1f;
     }
 
     // ── UI helpers ──

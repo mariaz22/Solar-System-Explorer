@@ -8,6 +8,10 @@ public class TravelState : State
     public override void OnEnter()
     {
         CameraController.Instance?.StartFollowing(probe.transform);
+        if (probe.Target != null)
+            MissionLog.Instance?.AddEntry(
+                $"En route to {probe.Target.data.planetName}.",
+                new UnityEngine.Color(0.4f, 0.8f, 1f));
     }
 
     public override void OnUpdate()

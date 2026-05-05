@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 public enum ProbeState { Idle, ChooseTarget, Travel, Scan, AvoidCollision, Return }
 
@@ -25,11 +26,33 @@ public class ProbeController : MonoBehaviour
 
     void Start()
     {
-        FSM.ChangeState(new IdleState(this));
+        FSM.ChangeState(new ManualControlState(this, null));
     }
 
     void Update()
     {
+        var kb = Keyboard.current;
+
+        if (kb.tabKey.wasPressedThisFrame)
+        {
+            if (FSM.CurrentState is ManualControlState)
+                FSM.ChangeState(new IdleState(this));
+            else
+                FSM.ChangeState(new ManualControlState(this, FSM.CurrentState));
+        }
+
+        // Orice tastă de mișcare din Standby intră automat în manual
+        if (FSM.CurrentState is IdleState)
+        {
+            bool anyMove = kb.wKey.isPressed || kb.sKey.isPressed ||
+                           kb.aKey.isPressed || kb.dKey.isPressed ||
+                           kb.upArrowKey.isPressed || kb.downArrowKey.isPressed ||
+                           kb.leftArrowKey.isPressed || kb.rightArrowKey.isPressed ||
+                           kb.qKey.isPressed || kb.eKey.isPressed;
+            if (anyMove)
+                FSM.ChangeState(new ManualControlState(this, null));
+        }
+
         FSM.Update();
     }
 

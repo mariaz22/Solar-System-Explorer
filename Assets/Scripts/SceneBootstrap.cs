@@ -46,6 +46,8 @@ public class SceneBootstrap : MonoBehaviour
         ConfigureLighting();
         ConfigureUI();
         gameObject.AddComponent<Starfield>();
+        if (GetComponent<RandomEventManager>() == null) gameObject.AddComponent<RandomEventManager>();
+        if (GetComponent<MissionLog>() == null) gameObject.AddComponent<MissionLog>();
     }
 
     void ConfigureLighting()
@@ -223,7 +225,7 @@ public class SceneBootstrap : MonoBehaviour
             Vector3 safe = new Vector3(0f, 0f, -(30.1f * auToUnits + probeStartOffset));
             probe.transform.position = safe;
             probe.transform.localScale = Vector3.one * 0.6f;
-            TintRenderer(probe.gameObject, new Color(0.15f, 0.85f, 1f), emissive: true);
+            if (probe.GetComponent<ProceduralRocket>() == null) probe.gameObject.AddComponent<ProceduralRocket>();
             if (probe.GetComponent<ProbeTrail>() == null) probe.gameObject.AddComponent<ProbeTrail>();
             var probeLight = probe.gameObject.GetComponent<Light>();
             if (probeLight == null) probeLight = probe.gameObject.AddComponent<Light>();

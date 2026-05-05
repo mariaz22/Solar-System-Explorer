@@ -26,14 +26,23 @@ public class ScanState : State
         {
             if (probe.Target != null)
             {
+                string name = probe.Target.data.planetName;
                 probe.Target.data.explored = true;
                 probe.Target.SetExplored();
+
+                string summary = MissionLog.GetScanSummary(name);
+                MissionLog.Instance?.AddEntry(
+                    $"Scan complete: <b>{name}</b>. {summary}",
+                    new UnityEngine.Color(0.3f, 1f, 0.55f));
             }
 
             TargetIndicator.Instance?.SetTarget(null);
 
             if (probe.AllPlanetsExplored())
             {
+                MissionLog.Instance?.AddEntry(
+                    "All planets explored. Returning to base.",
+                    new UnityEngine.Color(1f, 0.85f, 0.2f));
                 probe.FSM.ChangeState(new ReturnState(probe));
             }
             else
