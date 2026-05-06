@@ -1,0 +1,12 @@
+{
+    "asset": "9ab604b9c2f54fb4e9a118247ca4adb2",
+    "fileName": "019dfa40-ff19-763b-ab87-009f97135d94_Preview.jpg",
+    "prompt": "Extreme close-up photorealistic sun surface, boiling solar granules, visible plasma flares, dark sunspots, intricate incandescent patterns, orange and glowing white heat. High contrast, very textured. Seamless.",
+    "negativePrompt": "",
+    "model": "realistic-textures-3-0",
+    "modelName": "Realistic Textures 3.0",
+    "customSeed": 1822475279,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation"
+}

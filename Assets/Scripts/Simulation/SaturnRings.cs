@@ -41,9 +41,9 @@ public class SaturnRings : MonoBehaviour
             float sin = Mathf.Sin(t);
             verts[i * 2]     = new Vector3(cos * rIn,  0f, sin * rIn);
             verts[i * 2 + 1] = new Vector3(cos * rOut, 0f, sin * rOut);
-            uvs[i * 2]     = new Vector2(i / (float)segments, 0f);
-            uvs[i * 2 + 1] = new Vector2(i / (float)segments, 1f);
-        }
+            uvs[i * 2]     = new Vector2(0f, i / (float)segments);
+            uvs[i * 2 + 1] = new Vector2(1f, i / (float)segments);
+            }
 
         int tri = 0;
         for (int i = 0; i < segments; i++)
@@ -81,7 +81,7 @@ public class SaturnRings : MonoBehaviour
         mr.material = mat;
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
         mr.receiveShadows = false;
-    }
+        }
 
     static Texture2D BuildRingTexture()
     {

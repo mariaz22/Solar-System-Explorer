@@ -153,6 +153,7 @@ public class ManualControlState : State
         scanTarget.data.explored = true;
         scanTarget.SetExplored();
         scanTarget.GetComponent<ScanEffect>()?.Play(scanTarget.radius);
+        probe.LastScanned = scanTarget;
 
         string summary = MissionLog.GetScanSummary(name);
         MissionLog.Instance?.AddEntry(

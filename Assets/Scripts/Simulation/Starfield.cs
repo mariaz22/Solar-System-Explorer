@@ -16,6 +16,65 @@ public class Starfield : MonoBehaviour
         BuildSparkles();
     }
 
+    void BuildNebulae()
+    {
+        var root = new GameObject("Nebulae");
+        // Add a few large, very faint colorful clouds
+        AddNebula(root, new Color(0.1f, 0.2f, 0.5f, 0.05f), 1200f, 3);
+        AddNebula(root, new Color(0.4f, 0.1f, 0.3f, 0.04f), 1500f, 2);
+        AddNebula(root, new Color(0.1f, 0.4f, 0.2f, 0.03f), 1000f, 2);
+    }
+
+    void AddNebula(GameObject root, Color color, float size, int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            var go = GameObject.CreatePrimitive(PrimitiveType.Quad);
+            go.name = "NebulaCloud";
+            go.transform.SetParent(root.transform);
+            go.transform.position = Random.onUnitSphere * skyRadius * 0.9f;
+            go.transform.localScale = Vector3.one * size * Random.Range(0.8f, 1.5f);
+            go.transform.LookAt(Vector3.zero);
+            
+            Destroy(go.GetComponent<Collider>());
+            
+            var mr = go.GetComponent<MeshRenderer>();
+            var mat = new Material(Shader.Find("Universal Render Pipeline/Unlit"));
+            mat.SetFloat("_Surface", 1f); // Transparent
+            mat.SetFloat("_Blend", 0f);   // Alpha
+            mat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            mat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.One); // Additive for glow
+            mat.SetInt("_ZWrite", 0);
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent - 10;
+            
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", color);
+            
+            // We need a soft texture. Since we don't have one, we'll generate a simple radial gradient.
+            mat.mainTexture = GenerateSoftDot();
+            mr.material = mat;
+        }
+    }
+
+    Texture2D GenerateSoftDot()
+    {
+        int res = 64;
+        var tex = new Texture2D(res, res);
+        for (int y = 0; y < res; y++)
+        {
+            for (int x = 0; x < res; x++)
+            {
+                float dx = (x / (float)res) - 0.5f;
+                float dy = (y / (float)res) - 0.5f;
+                float d = Mathf.Sqrt(dx * dx + dy * dy) * 2f;
+                float a = Mathf.Clamp01(1f - d);
+                a = Mathf.Pow(a, 3f); // Softer falloff
+                tex.SetPixel(x, y, new Color(1, 1, 1, a));
+            }
+        }
+        tex.Apply();
+        return tex;
+    }
+
     void BuildSkySphere()
     {
         var sky = GameObject.CreatePrimitive(PrimitiveType.Sphere);
@@ -41,9 +100,9 @@ public class Starfield : MonoBehaviour
             if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", tex);
             if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", tex);
         }
-        // Slight brightness boost so the milky way is clearly visible
-        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", new Color(1.4f, 1.4f, 1.4f, 1f));
-        if (mat.HasProperty("_Surface")) mat.SetFloat("_Surface", 0f);
+        // Strong brightness boost to ensure the star background is clearly visible
+        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", new Color(2.8f, 2.8f, 2.8f, 1f));
+if (mat.HasProperty("_Surface")) mat.SetFloat("_Surface", 0f);
         if (mat.HasProperty("_Cull")) mat.SetFloat("_Cull", 0f); // Off — negative scale handles flip
         mat.SetOverrideTag("RenderType", "Opaque");
         mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Background;

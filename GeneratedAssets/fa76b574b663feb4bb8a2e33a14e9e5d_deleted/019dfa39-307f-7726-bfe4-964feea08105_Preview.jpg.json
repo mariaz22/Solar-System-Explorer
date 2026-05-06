@@ -1,0 +1,12 @@
+{
+    "asset": "fa76b574b663feb4bb8a2e33a14e9e5d",
+    "fileName": "019dfa39-307f-7726-bfe4-964feea08105_Preview.jpg",
+    "prompt": "Photorealistic sun surface texture, extreme high resolution, boiling plasma, solar flares, orange and yellow incandescent gas, granules and sunspots, glowing, intense heat. Seamless.",
+    "negativePrompt": "",
+    "model": "realistic-textures-3-0",
+    "modelName": "Realistic Textures 3.0",
+    "customSeed": 1118513677,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation"
+}

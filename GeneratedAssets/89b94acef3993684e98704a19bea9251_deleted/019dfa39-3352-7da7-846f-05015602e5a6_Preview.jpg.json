@@ -1,0 +1,12 @@
+{
+    "asset": "89b94acef3993684e98704a19bea9251",
+    "fileName": "019dfa39-3352-7da7-846f-05015602e5a6_Preview.jpg",
+    "prompt": "Photorealistic atmosphere of planet Venus, high resolution, thick swirling orange and pale yellow clouds, dense sulphuric acid clouds, hazy, volcanic vibe. Seamless.",
+    "negativePrompt": "",
+    "model": "realistic-textures-3-0",
+    "modelName": "Realistic Textures 3.0",
+    "customSeed": 949103878,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation"
+}

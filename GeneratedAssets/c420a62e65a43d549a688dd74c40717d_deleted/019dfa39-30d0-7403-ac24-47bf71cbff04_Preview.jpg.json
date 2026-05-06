@@ -1,0 +1,12 @@
+{
+    "asset": "c420a62e65a43d549a688dd74c40717d",
+    "fileName": "019dfa39-30d0-7403-ac24-47bf71cbff04_Preview.jpg",
+    "prompt": "Photorealistic surface of planet Mercury, high resolution, grey rocky terrain, heavily cratered, dusty, lunar-like surface, desolate. Seamless.",
+    "negativePrompt": "",
+    "model": "realistic-textures-3-0",
+    "modelName": "Realistic Textures 3.0",
+    "customSeed": 69498853,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation"
+}

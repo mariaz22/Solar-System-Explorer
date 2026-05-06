@@ -923,11 +923,11 @@ PlayerSettings:
   activeInputHandler: 1
   windowsGamepadBackendHint: 0
   enableDirectStorage: 0
-  cloudProjectId: 3d01365c-d6cc-4533-8f53-fb276f9ea3a5
+  cloudProjectId: 31fa8975-1d48-4a16-9487-8a08ab0e8b74
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: Solar System
-  organizationId: izabelajilavu
+  projectName: Solar System (2)
+  organizationId: horiafr
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0
   hmiLoadingImage: {fileID: 0}

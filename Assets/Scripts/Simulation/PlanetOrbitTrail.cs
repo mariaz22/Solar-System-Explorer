@@ -27,7 +27,8 @@ public class PlanetOrbitTrail : MonoBehaviour
 
     void Start()
     {
-        Color c = Color.Lerp(planetColor, Color.white, 0.3f);
+        float intensity = 1.8f;
+        Color c = Color.Lerp(planetColor, Color.white, 0.3f) * intensity;
         trail.startColor = new Color(c.r, c.g, c.b, 0.8f);
         trail.endColor = new Color(c.r, c.g, c.b, 0f);
         if (trail.material != null)

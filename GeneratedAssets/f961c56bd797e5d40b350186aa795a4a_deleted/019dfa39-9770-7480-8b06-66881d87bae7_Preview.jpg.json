@@ -1,0 +1,12 @@
+{
+    "asset": "f961c56bd797e5d40b350186aa795a4a",
+    "fileName": "019dfa39-9770-7480-8b06-66881d87bae7_Preview.jpg",
+    "prompt": "Photorealistic gas giant Uranus, high resolution, pale cyan-blue featureless atmosphere, methane haze, soft lighting. Seamless.",
+    "negativePrompt": "",
+    "model": "realistic-textures-3-0",
+    "modelName": "Realistic Textures 3.0",
+    "customSeed": 254649235,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation"
+}

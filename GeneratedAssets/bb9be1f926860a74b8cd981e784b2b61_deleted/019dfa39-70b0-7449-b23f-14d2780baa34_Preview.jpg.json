@@ -1,0 +1,12 @@
+{
+    "asset": "bb9be1f926860a74b8cd981e784b2b61",
+    "fileName": "019dfa39-70b0-7449-b23f-14d2780baa34_Preview.jpg",
+    "prompt": "Photorealistic gas giant Jupiter, high resolution, distinct colorful bands of clouds, beige, tan, and reddish-brown swirls, Great Red Spot, turbulent atmosphere. Seamless.",
+    "negativePrompt": "",
+    "model": "realistic-textures-3-0",
+    "modelName": "Realistic Textures 3.0",
+    "customSeed": 1595965119,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation"
+}

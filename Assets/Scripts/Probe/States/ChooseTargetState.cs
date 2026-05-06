@@ -32,7 +32,6 @@ public class ChooseTargetState : State
 
         if (probe.Path != null && probe.Path.Count >= 2)
         {
-            probe.PathVis.Show(probe.Path);
             probe.WaypointIndex = 1;
             probe.FSM.ChangeState(new TravelState(probe));
         }
