@@ -1,0 +1,12 @@
+{
+    "asset": "27394d66d679e444ab584eaeec151f51",
+    "fileName": "019dfa39-89ad-7a16-b431-ef865b84d119_Preview.jpg",
+    "prompt": "Photorealistic gas giant Saturn, high resolution, subtle horizontal bands of pale yellow and beige clouds, soft hazy atmosphere. Seamless.",
+    "negativePrompt": "",
+    "model": "realistic-textures-3-0",
+    "modelName": "Realistic Textures 3.0",
+    "customSeed": 1424257692,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation"
+}

@@ -98,11 +98,17 @@ public class CameraController : MonoBehaviour
         {
             elapsed += Time.deltaTime;
             float k = Mathf.SmoothStep(0f, 1f, elapsed / transitionTime);
+            
+            // Pulse scan overlay during transition
+            float scanK = Mathf.Sin(k * Mathf.PI);
+            HUDController.Instance?.SetScanAlpha(scanK);
+
             t.position = Vector3.Lerp(startPos, endPos, k);
-            t.rotation = Quaternion.Slerp(startRot, endRot, k);
+t.rotation = Quaternion.Slerp(startRot, endRot, k);
             yield return null;
         }
         t.position = endPos;
         t.rotation = endRot;
-    }
-}
+        HUDController.Instance?.SetScanAlpha(0f);
+        }
+        }

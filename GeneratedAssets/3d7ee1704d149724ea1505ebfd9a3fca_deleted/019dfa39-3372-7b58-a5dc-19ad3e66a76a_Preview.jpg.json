@@ -1,0 +1,12 @@
+{
+    "asset": "3d7ee1704d149724ea1505ebfd9a3fca",
+    "fileName": "019dfa39-3372-7b58-a5dc-19ad3e66a76a_Preview.jpg",
+    "prompt": "Photorealistic satellite view of Earth, high resolution, deep blue oceans, green and brown continents, swirling white cloud patterns, realistic landmasses. Seamless.",
+    "negativePrompt": "",
+    "model": "realistic-textures-3-0",
+    "modelName": "Realistic Textures 3.0",
+    "customSeed": 759516514,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation"
+}

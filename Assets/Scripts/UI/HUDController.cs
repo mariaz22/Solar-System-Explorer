@@ -24,6 +24,10 @@ public class HUDController : MonoBehaviour
     Image flashOverlay;
     float flashTimer;
 
+    // Scan overlay
+    Image scanOverlay;
+    float scanAlpha;
+
     static readonly (System.Type t, string text, Color col)[] StateMap =
     {
         (typeof(IdleState),           "*   STANDBY",    new Color(0.55f, 0.55f, 0.65f)),
@@ -59,7 +63,38 @@ public class HUDController : MonoBehaviour
         BuildControlsHint(root);
         BuildNotificationArea(root);
         BuildScreenFlash(root);
-    }
+        BuildScanOverlay(root);
+        }
+
+        void BuildScanOverlay(RectTransform root)
+        {
+            var scan = Panel("ScanOverlay", root, Color.clear);
+            scan.anchorMin = Vector2.zero; scan.anchorMax = Vector2.one;
+            scan.offsetMin = scan.offsetMax = Vector2.zero;
+        
+            scanOverlay = scan.gameObject.AddComponent<Image>();
+            scanOverlay.color = Color.clear;
+        
+            // Simple scanline texture
+            int res = 64;
+            var tex = new Texture2D(1, res);
+            for (int i = 0; i < res; i++)
+            {
+                float a = i % 2 == 0 ? 0.25f : 0f;
+                tex.SetPixel(0, i, new Color(1, 1, 1, a));
+            }
+            tex.Apply();
+            scanOverlay.sprite = Sprite.Create(tex, new Rect(0, 0, 1, res), Vector2.zero);
+            scanOverlay.type = Image.Type.Tiled;
+            scanOverlay.raycastTarget = false;
+        }
+
+        public void SetScanAlpha(float a)
+        {
+        scanAlpha = a;
+        if (scanOverlay != null)
+            scanOverlay.color = new Color(0f, 0.85f, 1f, a * 0.12f);
+        }
 
     void BuildBottomBar(RectTransform root)
     {
@@ -180,7 +215,15 @@ public class HUDController : MonoBehaviour
         UpdateState();
         UpdateMission();
         UpdateTimer();
-    }
+
+        // Animate scan overlay
+        if (scanAlpha > 0.01f && scanOverlay != null)
+        {
+            var rt = scanOverlay.rectTransform;
+            rt.anchoredPosition += Vector2.up * Time.deltaTime * 30f;
+            if (rt.anchoredPosition.y > 64f) rt.anchoredPosition = Vector2.zero;
+        }
+        }
 
     void UpdateState()
     {

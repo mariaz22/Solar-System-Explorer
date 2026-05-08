@@ -1,0 +1,12 @@
+{
+    "asset": "7bb9c918befa9a440a27a4df8a8dcfbf",
+    "fileName": "019dfa39-614b-7de1-876c-0ac2aae81811_Preview.jpg",
+    "prompt": "Photorealistic surface of planet Mars, high resolution, red-orange dusty terrain, craters, rocky valleys, thin atmosphere, iron oxide dust. Seamless.",
+    "negativePrompt": "",
+    "model": "realistic-textures-3-0",
+    "modelName": "Realistic Textures 3.0",
+    "customSeed": 806947928,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation"
+}

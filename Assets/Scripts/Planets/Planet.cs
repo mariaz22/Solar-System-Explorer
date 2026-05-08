@@ -33,13 +33,13 @@ public class Planet : MonoBehaviour
 
         if (on)
         {
-            runtimeMaterial.EnableKeyword("_EMISSION");
-            runtimeMaterial.SetColor("_EmissionColor", highlightColor * 1.5f);
+            // Selection highlight is now handled by the TargetIndicator arrow.
+            // We do nothing here to keep the planet texture clean.
         }
         else
         {
             runtimeMaterial.SetColor("_EmissionColor", data.explored
-                ? new Color(0f, 0.5f, 0.25f) * 1.2f
+                ? new Color(0f, 0.5f, 0.25f) * 0.5f
                 : baseEmission);
         }
     }

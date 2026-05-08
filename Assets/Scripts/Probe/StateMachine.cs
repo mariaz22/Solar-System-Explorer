@@ -6,6 +6,8 @@ public class StateMachine
 
     public void ChangeState(State newState)
     {
+        if (newState == null) return;
+
         string from = CurrentState?.GetType().Name ?? "None";
         CurrentState?.OnExit();
         CurrentState = newState;

@@ -64,24 +64,25 @@ public class SceneBootstrap : MonoBehaviour
             if (sunLight == null) sunLight = sun.AddComponent<Light>();
             sunLight.type = LightType.Point;
             sunLight.color = new Color(1f, 0.96f, 0.82f);
-            sunLight.intensity = 55f;
+            sunLight.intensity = 65f;
             sunLight.range = 8000f;
-            sunLight.shadows = LightShadows.None;
-        }
+            sunLight.shadows = LightShadows.Hard;
+            sunLight.shadowStrength = 0.9f;
+            }
 
-        foreach (var c in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
-        {
+            foreach (var c in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
+            {
             c.allowHDR = true;
             var urp = c.GetUniversalAdditionalCameraData();
             if (urp != null)
             {
                 urp.renderPostProcessing = true;
                 urp.antialiasing = AntialiasingMode.FastApproximateAntialiasing;
-            }
-        }
+                }
+                }
 
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.22f, 0.22f, 0.30f);
+        RenderSettings.ambientLight = new Color(0.05f, 0.05f, 0.08f); // Much darker ambient
 
         // Subtle fill light from camera direction so planet textures are always visible
         var fillGO = new GameObject("FillLight");
@@ -89,7 +90,7 @@ public class SceneBootstrap : MonoBehaviour
         var fill = fillGO.AddComponent<Light>();
         fill.type = LightType.Directional;
         fill.color = new Color(0.75f, 0.80f, 1.0f);
-        fill.intensity = 0.75f;
+        fill.intensity = 0.45f;
         fill.shadows = LightShadows.None;
         fillGO.transform.rotation = Quaternion.Euler(40f, 18f, 0f);
 
@@ -99,7 +100,7 @@ public class SceneBootstrap : MonoBehaviour
         var fill2 = fill2GO.AddComponent<Light>();
         fill2.type = LightType.Directional;
         fill2.color = new Color(0.40f, 0.45f, 0.65f);
-        fill2.intensity = 0.25f;
+        fill2.intensity = 0.15f;
         fill2.shadows = LightShadows.None;
         fill2GO.transform.rotation = Quaternion.Euler(145f, 195f, 0f);
 
@@ -112,10 +113,10 @@ public class SceneBootstrap : MonoBehaviour
 
         var colorAdj = bloomProfile.Add<UnityEngine.Rendering.Universal.ColorAdjustments>(true);
         colorAdj.active = true;
-        colorAdj.postExposure.Override(0.55f);
-        colorAdj.contrast.Override(14f);
-        colorAdj.saturation.Override(28f);
-        colorAdj.colorFilter.Override(new Color(0.96f, 0.97f, 1.0f));
+        colorAdj.postExposure.Override(0.25f);
+        colorAdj.contrast.Override(18f);
+        colorAdj.saturation.Override(45f); // Increased saturation for vibrant nebulae
+        colorAdj.colorFilter.Override(Color.white);
 
         var vignette = bloomProfile.Add<UnityEngine.Rendering.Universal.Vignette>(true);
         vignette.active = true;
@@ -124,11 +125,11 @@ public class SceneBootstrap : MonoBehaviour
 
         var bloom = bloomProfile.Add<UnityEngine.Rendering.Universal.Bloom>(true);
         bloom.active = true;
-        bloom.threshold.Override(0.95f);
-        bloom.intensity.Override(1.2f);
-        bloom.scatter.Override(0.45f);
-        bloom.tint.Override(new Color(1f, 0.95f, 0.88f));
-        bloom.highQualityFiltering.Override(true);
+        bloom.threshold.Override(1.02f); // Lower threshold so stars and textures can glow slightly
+        bloom.intensity.Override(0.7f);  // Slightly higher intensity
+        bloom.scatter.Override(0.7f);
+        bloom.tint.Override(new Color(1f, 0.95f, 0.85f));
+bloom.highQualityFiltering.Override(true);
 
         var volGO = new GameObject("RuntimeBloomVolume");
         volGO.transform.SetParent(transform, false);
@@ -217,16 +218,16 @@ public class SceneBootstrap : MonoBehaviour
 
             if (p.GetComponent<ScanEffect>() == null)
                 p.gameObject.AddComponent<ScanEffect>();
-        }
+            }
 
         var probe = Object.FindAnyObjectByType<ProbeController>();
         if (probe != null)
         {
             Vector3 safe = new Vector3(0f, 0f, -(30.1f * auToUnits + probeStartOffset));
             probe.transform.position = safe;
-            probe.transform.localScale = Vector3.one * 0.6f;
+            probe.transform.localScale = Vector3.one * 1.2f;
             if (probe.GetComponent<ProceduralRocket>() == null) probe.gameObject.AddComponent<ProceduralRocket>();
-            if (probe.GetComponent<ProbeTrail>() == null) probe.gameObject.AddComponent<ProbeTrail>();
+            if (probe.GetComponent<RocketExhaust>() == null) probe.gameObject.AddComponent<RocketExhaust>();
             var probeLight = probe.gameObject.GetComponent<Light>();
             if (probeLight == null) probeLight = probe.gameObject.AddComponent<Light>();
             probeLight.type = LightType.Point;
@@ -250,26 +251,35 @@ public class SceneBootstrap : MonoBehaviour
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Color.black;
             if (cam.GetComponent<FreeFlyCamera>() == null) cam.gameObject.AddComponent<FreeFlyCamera>();
-        }
-    }
+            }
+            }
 
     void ApplyRealTexture(GameObject go, Texture2D tex, bool emissive = false)
     {
         var r = go.GetComponentInChildren<Renderer>();
         if (r == null) return;
-        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        var litShader   = Shader.Find("Universal Render Pipeline/Lit");
-        var unlitShader = Shader.Find("Universal Render Pipeline/Unlit");
-        var shader = emissive && unlitShader != null ? unlitShader : litShader;
-        var m = new Material(shader != null ? shader : r.sharedMaterial.shader);
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; // Enable shadow casting
+        r.receiveShadows = true;
+        
+        var litShader = Shader.Find("Universal Render Pipeline/Lit");
+var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         r.material = m;
+
         if (m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", tex);
         if (m.HasProperty("_MainTex")) m.SetTexture("_MainTex", tex);
         m.mainTexture = tex;
-        Color baseColor = emissive ? new Color(2.2f, 2.0f, 1.6f) : Color.white;
-        if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", baseColor);
-        if (!emissive)
+
+        if (emissive)
         {
+            m.EnableKeyword("_EMISSION");
+            if (m.HasProperty("_EmissionMap")) m.SetTexture("_EmissionMap", tex);
+            // High intensity for that "Sun" look, but tinted so texture is visible
+            if (m.HasProperty("_EmissionColor")) m.SetColor("_EmissionColor", new Color(1f, 0.8f, 0.4f) * 2.2f);
+            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", Color.white);
+        }
+        else
+        {
+            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", Color.white);
             if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
             if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.1f);
         }
@@ -312,7 +322,7 @@ public class SceneBootstrap : MonoBehaviour
         if (m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", maps.albedo);
         if (m.HasProperty("_MainTex")) m.SetTexture("_MainTex", maps.albedo);
         m.mainTexture = maps.albedo;
-        Color baseColor = emissive ? new Color(2.8f, 2.6f, 2.0f, 1f) : Color.white;
+        Color baseColor = emissive ? new Color(2.5f, 2.3f, 1.8f, 1f) : new Color(0.85f, 0.85f, 0.85f, 1f);
         if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", baseColor);
         if (m.HasProperty("_Color")) m.color = baseColor;
         if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.08f);
@@ -357,8 +367,8 @@ public class SceneBootstrap : MonoBehaviour
         var glowTex = ProceduralPlanetTexture.GenerateSunGlow();
         if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", glowTex);
         if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", glowTex);
-        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", new Color(1f, 0.88f, 0.58f, 1f));
-        if (mat.HasProperty("_Color")) mat.color = new Color(1f, 0.88f, 0.58f, 1f);
+        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", new Color(1f, 0.88f, 0.58f, 0.35f));
+        if (mat.HasProperty("_Color")) mat.color = new Color(1f, 0.88f, 0.58f, 0.35f);
         mr.material = mat;
 
         glow.AddComponent<Billboard>();
@@ -387,10 +397,10 @@ public class SceneBootstrap : MonoBehaviour
         var coronaTex = ProceduralPlanetTexture.GenerateSunGlow();
         if (mat2.HasProperty("_BaseMap")) mat2.SetTexture("_BaseMap", coronaTex);
         if (mat2.HasProperty("_MainTex")) mat2.SetTexture("_MainTex", coronaTex);
-        if (mat2.HasProperty("_BaseColor")) mat2.SetColor("_BaseColor", new Color(1f, 0.75f, 0.35f, 0.4f));
-        if (mat2.HasProperty("_Color")) mat2.color = new Color(1f, 0.75f, 0.35f, 0.4f);
+        if (mat2.HasProperty("_BaseColor")) mat2.SetColor("_BaseColor", new Color(1f, 0.75f, 0.35f, 0.15f));
+        if (mat2.HasProperty("_Color")) mat2.color = new Color(1f, 0.75f, 0.35f, 0.15f);
         mr2.material = mat2;
-        corona.AddComponent<Billboard>();
+corona.AddComponent<Billboard>();
     }
 
     void AddAtmosphere(GameObject planet, Color baseColor)

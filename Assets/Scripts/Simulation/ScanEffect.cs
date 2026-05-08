@@ -44,7 +44,9 @@ public class ScanEffect : MonoBehaviour
         float r = planetR * (1f + t * 4f);
         float alpha = Mathf.Sin(t * Mathf.PI);
 
-        Color c = Color.Lerp(new Color(0f, 1f, 0.5f), new Color(0.2f, 0.5f, 1f), t);
+        float intensity = 2.5f;
+        Color baseC = Color.Lerp(new Color(0f, 1f, 0.5f), new Color(0.2f, 0.5f, 1f), t);
+        Color c = baseC * intensity;
         c.a = alpha * 0.9f;
         ring.startColor = ring.endColor = c;
         ring.widthMultiplier = Mathf.Lerp(0.28f, 0.04f, t);

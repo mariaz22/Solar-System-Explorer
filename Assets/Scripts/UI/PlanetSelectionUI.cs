@@ -82,6 +82,14 @@ public class PlanetSelectionUI : MonoBehaviour
         selected.SetSelected(true);
 
         UpdateInfo();
+        if (TargetIndicator.Instance != null)
+        {
+            TargetIndicator.Instance.SetTarget(p);
+        }
+        else
+        {
+            Debug.LogWarning("TargetIndicator.Instance is null during Select!");
+        }
 
         if (CameraController.Instance != null) CameraController.Instance.MoveTo(p);
 

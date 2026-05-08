@@ -29,6 +29,7 @@ public class ScanState : State
                 string name = probe.Target.data.planetName;
                 probe.Target.data.explored = true;
                 probe.Target.SetExplored();
+                probe.LastScanned = probe.Target;
 
                 string summary = MissionLog.GetScanSummary(name);
                 MissionLog.Instance?.AddEntry(

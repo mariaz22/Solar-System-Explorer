@@ -9,9 +9,14 @@ public class ProbeController : MonoBehaviour
 {
     public float speed = 10f;
     public float arrivalThreshold = 0.5f;
+    public float avoidanceStrength = 15f;
+    public float lookAheadDistance = 10f;
+    public float avoidanceRadius = 1.5f;
 
     public StateMachine FSM { get; private set; } = new StateMachine();
+    public bool IsThrusting { get; set; }
     public Planet Target { get; set; }
+    public Planet LastScanned { get; set; }
     public string TargetReason { get; set; } = "";
     public List<Vector3> Path { get; set; }
     public int WaypointIndex { get; set; }

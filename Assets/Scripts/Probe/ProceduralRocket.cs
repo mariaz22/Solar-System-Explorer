@@ -39,9 +39,9 @@ public class ProceduralRocket : MonoBehaviour
         var bell = Part(PrimitiveType.Cylinder, root, new Vector3(0f, -0.75f, 0f), new Vector3(0.30f, 0.18f, 0.30f));
         Solid(bell, new Color(0.22f, 0.22f, 0.26f), metallic: 0.7f);
 
-        // Engine exhaust glow
-        var exhaust = Part(PrimitiveType.Sphere, root, new Vector3(0f, -0.96f, 0f), new Vector3(0.20f, 0.20f, 0.20f));
-        Emissive(exhaust, new Color(1.00f, 0.52f, 0.08f), 4f);
+        // Engine exhaust glow (internal)
+        var exhaust = Part(PrimitiveType.Sphere, root, new Vector3(0f, -0.9f, 0f), new Vector3(0.25f, 0.15f, 0.25f));
+        Emissive(exhaust, new Color(1.00f, 0.6f, 0.1f), 6f);
 
         // 3 fins
         for (int i = 0; i < 3; i++)

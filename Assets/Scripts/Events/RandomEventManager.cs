@@ -211,6 +211,8 @@ public class RandomEventManager : MonoBehaviour
             Vector3 spawnPos = -direction * 220f + spread;
 
             var meteor = BuildMeteor(spawnPos, direction);
+            var col = meteor.GetComponent<Collider>();
+            if (col != null) col.isTrigger = true;
             meteors.Add(meteor);
 
             yield return new WaitForSeconds(Random.Range(0.1f, 0.5f));
@@ -227,7 +229,8 @@ public class RandomEventManager : MonoBehaviour
             size * Random.Range(0.8f, 1.3f),
             size * Random.Range(0.7f, 1.1f),
             size * Random.Range(0.9f, 1.4f));
-        Destroy(go.GetComponent<Collider>());
+        var col = go.GetComponent<Collider>();
+        if (col != null) col.isTrigger = true;
 
         // Rocky material
         var r = go.GetComponent<Renderer>();
@@ -399,7 +402,8 @@ public class RandomEventManager : MonoBehaviour
             size * Random.Range(0.8f, 1.0f),
             size * Random.Range(0.6f, 0.9f),
             size * Random.Range(0.8f, 1.0f));
-        Destroy(go.GetComponent<Collider>());
+        var col = go.GetComponent<Collider>();
+        if (col != null) col.isTrigger = true;
 
         var r = go.GetComponent<Renderer>();
         var mat = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? r.sharedMaterial.shader);

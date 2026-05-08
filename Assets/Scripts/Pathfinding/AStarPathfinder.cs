@@ -6,17 +6,23 @@ public static class AStarPathfinder
     [System.Serializable]
     public class Settings
     {
-        public int waypointsPerPlanet = 6;
-        public float waypointDistanceMultiplier = 2.5f;
-        public float massPenaltyRadiusMultiplier = 5f;
-        public float massPenaltyStrength = 2f;
+        public int waypointsPerPlanet = 12; // Increased from 6
+        public float waypointDistanceMultiplier = 3.0f; // Increased from 2.5
+        public float massPenaltyRadiusMultiplier = 6f; // Increased from 5
+        public float massPenaltyStrength = 3f; // Increased from 2
     }
 
     static readonly Vector3[] WaypointDirs =
     {
         Vector3.up, Vector3.down,
         Vector3.left, Vector3.right,
-        Vector3.forward, Vector3.back
+        Vector3.forward, Vector3.back,
+        (Vector3.up + Vector3.right).normalized,
+        (Vector3.up + Vector3.left).normalized,
+        (Vector3.down + Vector3.right).normalized,
+        (Vector3.down + Vector3.left).normalized,
+        (Vector3.forward + Vector3.up).normalized,
+        (Vector3.back + Vector3.up).normalized
     };
 
     public static List<Vector3> FindPath(Vector3 start, Vector3 end, IList<Planet> planets, Settings s = null)
@@ -65,18 +71,41 @@ public static class AStarPathfinder
     static bool SegmentClear(Vector3 a, Vector3 b, IList<Planet> planets, Settings s, out float penalty)
     {
         penalty = 0f;
+        
+        // 1. Check Nebulae Hazards with dynamic cost sampling
+        var nebulae = Object.FindObjectsByType<ReactiveNebula>(FindObjectsInactive.Exclude);
+        foreach (var n in nebulae)
+        {
+            // Sample density at 5 points along the segment to find tunnels
+            for (int step = 0; step <= 4; step++)
+            {
+                float t = step / 4f;
+Vector3 samplePos = Vector3.Lerp(a, b, t);
+                float density = n.GetDensityAt(samplePos);
+                
+                if (density > 0.05f)
+                {
+                    penalty += 300f * Mathf.Pow(density, 2f);
+                    // Danger zones (lilac, density > 0.65) get heavy extra penalty
+                    // so autopilot strongly prefers tunnels and open corridors
+                    if (density > 0.65f)
+                        penalty += 900f * Mathf.Pow(density - 0.65f, 1.5f);
+                }
+            }
+        }
+
         if (planets == null) return true;
 
         foreach (var p in planets)
         {
             if (p == null) continue;
             Vector3 c = p.transform.position;
-            float surface = p.radius * 1.05f;
+            float surface = p.radius * 1.25f; // Increased safety margin from 1.05
             bool ownsEndpoint = Vector3.Distance(c, a) < surface || Vector3.Distance(c, b) < surface;
 
             float d = DistancePointToSegment(c, a, b);
-            if (!ownsEndpoint && d < p.radius) return false;
-            if (ownsEndpoint) continue;
+            if (!ownsEndpoint && d < p.radius * 1.2f) return false; // Increased clearance
+if (ownsEndpoint) continue;
 
             float zone = p.radius * s.massPenaltyRadiusMultiplier;
             if (d < zone)

@@ -65,10 +65,13 @@ public class ManualControlState : State
         if (kb.qKey.isPressed) move += Vector3.up;
         if (kb.eKey.isPressed) move -= Vector3.up;
 
-        if (move.sqrMagnitude > 0.01f)
+        probe.IsThrusting = move.sqrMagnitude > 0.01f;
+
+        if (probe.IsThrusting)
         {
             bool boost = kb.leftShiftKey.isPressed || kb.rightShiftKey.isPressed;
             float speed = boost ? BoostSpeed : MoveSpeed;
+            speed *= GetNebulaSpeedMultiplier(probe.transform.position);
             probe.transform.position += move.normalized * speed * Time.deltaTime;
 
             // Rotate probe only on horizontal plane so camera stays behind, not below
@@ -77,6 +80,15 @@ public class ManualControlState : State
                 probe.transform.forward = Vector3.Slerp(
                     probe.transform.forward, horizontal.normalized, Time.deltaTime * 8f);
         }
+    }
+
+    static float GetNebulaSpeedMultiplier(Vector3 pos)
+    {
+        float maxDensity = 0f;
+        var nebulae = Object.FindObjectsByType<ReactiveNebula>(FindObjectsInactive.Exclude);
+        foreach (var n in nebulae)
+            maxDensity = Mathf.Max(maxDensity, n.GetDensityAt(pos));
+        return Mathf.Lerp(1f, 0.5f, maxDensity);
     }
 
     void HandleScan()
@@ -153,6 +165,7 @@ public class ManualControlState : State
         scanTarget.data.explored = true;
         scanTarget.SetExplored();
         scanTarget.GetComponent<ScanEffect>()?.Play(scanTarget.radius);
+        probe.LastScanned = scanTarget;
 
         string summary = MissionLog.GetScanSummary(name);
         MissionLog.Instance?.AddEntry(
@@ -181,6 +194,7 @@ public class ManualControlState : State
 
     public override void OnExit()
     {
+        probe.IsThrusting = false;
         probe.Target = null;
         CameraController.Instance?.StopFollowing();
         if (returnState != null)

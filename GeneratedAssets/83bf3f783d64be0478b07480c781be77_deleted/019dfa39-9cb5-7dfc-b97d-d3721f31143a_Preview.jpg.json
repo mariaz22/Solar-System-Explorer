@@ -1,0 +1,12 @@
+{
+    "asset": "83bf3f783d64be0478b07480c781be77",
+    "fileName": "019dfa39-9cb5-7dfc-b97d-d3721f31143a_Preview.jpg",
+    "prompt": "Photorealistic gas giant Neptune, high resolution, deep blue atmosphere, faint cloud streaks, Great Dark Spot, windy turbulent gas layers. Seamless.",
+    "negativePrompt": "",
+    "model": "realistic-textures-3-0",
+    "modelName": "Realistic Textures 3.0",
+    "customSeed": 1884230161,
+    "w3CTraceId": "",
+    "feedback": 0,
+    "refinementMode": "Generation"
+}
