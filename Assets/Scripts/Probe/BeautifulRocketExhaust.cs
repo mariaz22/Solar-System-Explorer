@@ -51,7 +51,12 @@ public class BeautifulRocketExhaust : MonoBehaviour
         emitterGo.transform.localRotation = Quaternion.Euler(180f, 0f, 0f);
 
         mainFlame  = BuildMainFlame(emitterGo);
-        innerFlame = BuildInnerFlame(emitterGo);
+
+        var innerEmitterGo = new GameObject("InnerFlameEmitter");
+        innerEmitterGo.transform.SetParent(emitterGo.transform, false);
+        innerEmitterGo.transform.localPosition = Vector3.zero;
+        innerEmitterGo.transform.localRotation = Quaternion.identity;
+        innerFlame = BuildInnerFlame(innerEmitterGo);
         coreGlow   = BuildCoreGlow(exhaustRoot.transform);
 
         var lightGo = new GameObject("ThrustLight");
