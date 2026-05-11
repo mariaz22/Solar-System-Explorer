@@ -8,11 +8,11 @@ using UnityEngine.UI;
 public class SceneBootstrap : MonoBehaviour
 {
     [Header("Layout")]
-    public float auToUnits = 6f;
+    public float auToUnits = 18f;
     public float probeStartOffset = 10f;
 
     [Header("Planet sizes (diameter in world units)")]
-    public float sunScale = 10f;
+    public float sunScale = 220f;
     public float minPlanetScale = 3.0f;
     public float massToScale = 2.5f;
 
@@ -42,12 +42,31 @@ public class SceneBootstrap : MonoBehaviour
 
     void Awake()
     {
+        // Force override any stale Inspector-serialized values
+        sunScale = 220f;
+
+        // Reposition & scale nebulae around the solar system before their Awake() runs
+        var nebulaPositions = new Vector3[]
+        {
+            new Vector3( 550f,  80f, -300f),   // between Jupiter & Saturn, right side
+            new Vector3(-480f, -60f,  420f),   // outer left, opposite side
+            new Vector3( 150f, 120f,  680f),   // near Uranus, far side
+            new Vector3(-700f,  40f, -200f),   // deep outer system left
+        };
+        var nebulae = Object.FindObjectsByType<ReactiveNebula>(FindObjectsInactive.Include);
+        for (int i = 0; i < nebulae.Length; i++)
+        {
+            nebulae[i].radius = 340f;
+            nebulae[i].transform.position = nebulaPositions[i % nebulaPositions.Length];
+        }
+
         LayoutSolarSystem();
         ConfigureLighting();
         ConfigureUI();
         gameObject.AddComponent<Starfield>();
         if (GetComponent<RandomEventManager>() == null) gameObject.AddComponent<RandomEventManager>();
         if (GetComponent<MissionLog>() == null) gameObject.AddComponent<MissionLog>();
+        if (GetComponent<SolarWind>() == null) gameObject.AddComponent<SolarWind>();
     }
 
     void ConfigureLighting()
@@ -66,8 +85,7 @@ public class SceneBootstrap : MonoBehaviour
             sunLight.color = new Color(1f, 0.96f, 0.82f);
             sunLight.intensity = 65f;
             sunLight.range = 8000f;
-            sunLight.shadows = LightShadows.Hard;
-            sunLight.shadowStrength = 0.9f;
+            sunLight.shadows = LightShadows.None;
             }
 
             foreach (var c in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
@@ -178,12 +196,34 @@ bloom.highQualityFiltering.Override(true);
             p.data.distanceFromSun = def.au;
             p.data.relativeMass = def.mass;
 
-            float r = sunScale * 0.55f + Mathf.Pow(def.au, 0.55f) * auToUnits * 4.5f;
+            float r = p.data.planetName switch
+            {
+                "Mercury" => 190f,
+                "Venus"   => 235f,
+                "Earth"   => 285f,
+                "Mars"    => 340f,
+                "Jupiter" => 490f,
+                "Saturn"  => 645f,
+                "Uranus"  => 790f,
+                "Neptune" => 925f,
+                _         => 300f,
+            };
             Vector3 pos = new Vector3(Mathf.Cos(angle) * r, 0f, Mathf.Sin(angle) * r);
             p.transform.position = pos;
             angle += angleStep;
 
-            float s = Mathf.Max(4.0f, Mathf.Log10(def.mass * 10f + 1f) * 4.2f);
+            float s = p.data.planetName switch
+            {
+                "Mercury" => 12f,
+                "Venus"   => 22f,
+                "Earth"   => 22f,
+                "Mars"    => 16f,
+                "Jupiter" => 88f,
+                "Saturn"  => 74f,
+                "Uranus"  => 42f,
+                "Neptune" => 38f,
+                _         => 12f,
+            };
             p.transform.localScale = Vector3.one * s;
 
             var realTex = Resources.Load<Texture2D>($"PlanetTextures/{p.data.planetName}");
@@ -220,12 +260,45 @@ bloom.highQualityFiltering.Override(true);
                 p.gameObject.AddComponent<ScanEffect>();
             }
 
+        // ── Asteroid belt (between Mars and Jupiter) ──────────────────
+        if (sunT != null)
+        {
+            float marsOrbit    = 340f;
+            float jupiterOrbit = 490f;
+            float beltMin = marsOrbit    + (jupiterOrbit - marsOrbit) * 0.25f;
+            float beltMax = jupiterOrbit - (jupiterOrbit - marsOrbit) * 0.25f;
+
+            var beltGO = new GameObject("AsteroidBelt");
+            beltGO.transform.SetParent(transform, false);
+            var belt = beltGO.AddComponent<AsteroidBelt>();
+            belt.center    = sunT;
+            belt.minRadius = beltMin;
+            belt.maxRadius = beltMax;
+            belt.count     = 350;
+            belt.height    = 5f;
+            belt.minSize   = 0.35f;
+            belt.maxSize   = 1.4f;
+        }
+
+        // ── Moons for gas giants ──────────────────────────────────────
+        foreach (var p in planets)
+        {
+            if (p == null) continue;
+            SpawnMoons(p);
+        }
+
         var probe = Object.FindAnyObjectByType<ProbeController>();
         if (probe != null)
         {
-            Vector3 safe = new Vector3(0f, 0f, -(30.1f * auToUnits + probeStartOffset));
+            Vector3 safe = new Vector3(0f, 0f, -(925f + probeStartOffset));
             probe.transform.position = safe;
             probe.transform.localScale = Vector3.one * 1.2f;
+            // Force override serialized Inspector values to match current system scale
+            probe.speed             = 85f;
+            probe.arrivalThreshold  = 18f;
+            probe.avoidanceStrength = 220f;
+            probe.lookAheadDistance = 160f;
+            probe.avoidanceRadius   = 20f;
             if (probe.GetComponent<ProceduralRocket>() == null) probe.gameObject.AddComponent<ProceduralRocket>();
             if (probe.GetComponent<RocketExhaust>() == null) probe.gameObject.AddComponent<RocketExhaust>();
             var probeLight = probe.gameObject.GetComponent<Light>();
@@ -243,9 +316,9 @@ bloom.highQualityFiltering.Override(true);
         var cam = Camera.main;
         if (cam != null)
         {
-            cam.transform.position = new Vector3(20f, 120f, -170f);
-            cam.transform.rotation = Quaternion.Euler(34f, -6f, 0f);
-            cam.fieldOfView = 62f;
+            cam.transform.position = new Vector3(80f, 780f, -1160f);
+            cam.transform.rotation = Quaternion.Euler(33f, -3f, 0f);
+            cam.fieldOfView = 73f;
             cam.farClipPlane = 10000f;
             cam.nearClipPlane = 0.1f;
             cam.clearFlags = CameraClearFlags.SolidColor;
@@ -274,7 +347,7 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
             m.EnableKeyword("_EMISSION");
             if (m.HasProperty("_EmissionMap")) m.SetTexture("_EmissionMap", tex);
             // High intensity for that "Sun" look, but tinted so texture is visible
-            if (m.HasProperty("_EmissionColor")) m.SetColor("_EmissionColor", new Color(1f, 0.8f, 0.4f) * 2.2f);
+            if (m.HasProperty("_EmissionColor")) m.SetColor("_EmissionColor", new Color(1f, 0.75f, 0.3f) * 4.5f);
             if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", Color.white);
         }
         else
@@ -338,12 +411,76 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         }
     }
 
+    // orbit multipliers are relative to planet radius (so they always sit outside the planet)
+    static readonly Dictionary<string, (int count, float minMult, float maxMult, float minSizeMult, float maxSizeMult)> moonData = new()
+    {
+        { "Jupiter", (4, 1.6f, 3.6f, 0.30f, 0.52f) },
+        { "Saturn",  (3, 1.6f, 3.4f, 0.28f, 0.48f) },
+        { "Uranus",  (2, 1.7f, 3.1f, 0.30f, 0.48f) },
+        { "Neptune", (2, 1.7f, 3.0f, 0.28f, 0.46f) },
+        { "Earth",   (1, 2.4f, 2.8f, 0.55f, 0.72f) },
+        { "Mars",    (2, 2.0f, 2.9f, 0.25f, 0.36f) },
+    };
+
+    void SpawnMoons(Planet planet)
+    {
+        if (!moonData.TryGetValue(planet.data.planetName, out var md)) return;
+
+        float planetRadius = planet.transform.localScale.x * 0.5f;
+
+        for (int i = 0; i < md.count; i++)
+        {
+            float orbitRadius = planetRadius * Random.Range(md.minMult, md.maxMult);
+            float moonSize    = planetRadius * Random.Range(md.minSizeMult, md.maxSizeMult);
+            float startAngle  = Random.Range(0f, 360f);
+            float inclination = Random.Range(-15f, 15f);
+
+            // Place moon at its starting orbit position
+            float rad = startAngle * Mathf.Deg2Rad;
+            Vector3 localOffset = new Vector3(Mathf.Cos(rad) * orbitRadius, 0f, Mathf.Sin(rad) * orbitRadius);
+            // Apply inclination tilt
+            localOffset = Quaternion.Euler(inclination, 0f, 0f) * localOffset;
+            Vector3 worldPos = planet.transform.position + localOffset;
+
+            var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            go.name = $"{planet.data.planetName}_Moon{i + 1}";
+            go.transform.position = worldPos;
+            go.transform.localScale = Vector3.one * moonSize;
+            Destroy(go.GetComponent<SphereCollider>());
+
+            // Rocky moon material — use Unlit so it's always visible regardless of light distance
+            var mr  = go.GetComponent<MeshRenderer>();
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Universal Render Pipeline/Unlit");
+            var mat = new Material(shader);
+            float g = Random.Range(0.48f, 0.70f);
+            Color moonColor = new Color(g * Random.Range(0.95f, 1.05f),
+                                        g * Random.Range(0.90f, 1.00f),
+                                        g * Random.Range(0.82f, 0.94f));
+            if (mat.HasProperty("_BaseColor"))  mat.SetColor("_BaseColor",  moonColor);
+            if (mat.HasProperty("_Smoothness")) mat.SetFloat("_Smoothness", 0.05f);
+            if (mat.HasProperty("_Metallic"))   mat.SetFloat("_Metallic",   0f);
+            mr.material = mat;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows    = false;
+
+            // Self-rotation
+            var spin = go.AddComponent<SelfRotation>();
+            spin.degreesPerSecond = Random.Range(5f, 20f);
+
+            // Orbit around parent planet — faster for inner moons (Kepler)
+            var orbit = go.AddComponent<OrbitalMotion>();
+            orbit.center         = planet.transform;
+            orbit.angularSpeedDeg = 25f / Mathf.Pow(orbitRadius, 0.75f);
+            orbit.axis           = Quaternion.Euler(inclination, 0f, 0f) * Vector3.up;
+        }
+    }
+
     void AddSunGlow(GameObject sun)
     {
         var glow = new GameObject("SunGlow");
         glow.transform.SetParent(sun.transform, false);
         glow.transform.localPosition = Vector3.zero;
-        glow.transform.localScale = Vector3.one * 5.5f;
+        glow.transform.localScale = Vector3.one * 1.75f;
 
         var mf = glow.AddComponent<MeshFilter>();
         mf.mesh = BuildQuadMesh();
@@ -367,8 +504,8 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         var glowTex = ProceduralPlanetTexture.GenerateSunGlow();
         if (mat.HasProperty("_BaseMap")) mat.SetTexture("_BaseMap", glowTex);
         if (mat.HasProperty("_MainTex")) mat.SetTexture("_MainTex", glowTex);
-        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", new Color(1f, 0.88f, 0.58f, 0.35f));
-        if (mat.HasProperty("_Color")) mat.color = new Color(1f, 0.88f, 0.58f, 0.35f);
+        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", new Color(1f, 0.88f, 0.55f, 0.70f));
+        if (mat.HasProperty("_Color")) mat.color = new Color(1f, 0.88f, 0.55f, 0.70f);
         mr.material = mat;
 
         glow.AddComponent<Billboard>();
@@ -377,7 +514,7 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         var corona = new GameObject("SunCorona");
         corona.transform.SetParent(sun.transform, false);
         corona.transform.localPosition = Vector3.zero;
-        corona.transform.localScale = Vector3.one * 9.5f;
+        corona.transform.localScale = Vector3.one * 3.2f;
         var mf2 = corona.AddComponent<MeshFilter>();
         mf2.mesh = BuildQuadMesh();
         var mr2 = corona.AddComponent<MeshRenderer>();
@@ -397,52 +534,72 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         var coronaTex = ProceduralPlanetTexture.GenerateSunGlow();
         if (mat2.HasProperty("_BaseMap")) mat2.SetTexture("_BaseMap", coronaTex);
         if (mat2.HasProperty("_MainTex")) mat2.SetTexture("_MainTex", coronaTex);
-        if (mat2.HasProperty("_BaseColor")) mat2.SetColor("_BaseColor", new Color(1f, 0.75f, 0.35f, 0.15f));
-        if (mat2.HasProperty("_Color")) mat2.color = new Color(1f, 0.75f, 0.35f, 0.15f);
+        if (mat2.HasProperty("_BaseColor")) mat2.SetColor("_BaseColor", new Color(1f, 0.72f, 0.25f, 0.45f));
+        if (mat2.HasProperty("_Color")) mat2.color = new Color(1f, 0.72f, 0.25f, 0.45f);
         mr2.material = mat2;
 corona.AddComponent<Billboard>();
     }
 
     void AddAtmosphere(GameObject planet, Color baseColor)
     {
-        // Only add visible atmosphere glow for planets with significant atmospheres
-        string name = planet.name;
-        bool hasAtmo = name == "Earth" || name == "Venus" || name == "Uranus" || name == "Neptune";
-        float scale = hasAtmo ? 1.08f : 1.05f;
-        float alpha  = hasAtmo ? 0.055f : 0.025f;
+        string pname  = planet.name;
+        bool hasAtmo  = pname == "Earth" || pname == "Venus" || pname == "Uranus" || pname == "Neptune";
+        bool thinAtmo = pname == "Mars" || pname == "Jupiter" || pname == "Saturn";
+
+        // Skip completely airless bodies
+        if (!hasAtmo && !thinAtmo) return;
+
+        float scale      = hasAtmo ? 1.12f : 1.07f;
+        float intensity  = hasAtmo ? 1.0f  : 0.4f;
+        float fresnelPow = hasAtmo ? 3.5f  : 5.0f;
+        float innerAlpha = hasAtmo ? 0.02f : 0.005f;
 
         var atmo = GameObject.CreatePrimitive(PrimitiveType.Sphere);
         atmo.name = "Atmosphere";
         Object.Destroy(atmo.GetComponent<SphereCollider>());
         atmo.transform.SetParent(planet.transform, false);
         atmo.transform.localPosition = Vector3.zero;
-        atmo.transform.localScale = Vector3.one * scale;
+        atmo.transform.localScale    = Vector3.one * scale;
 
         var mr = atmo.GetComponent<MeshRenderer>();
         mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
-        mr.receiveShadows = false;
+        mr.receiveShadows    = false;
 
-        var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Transparent");
-        var mat = new Material(shader);
-        if (mat.HasProperty("_Surface")) mat.SetFloat("_Surface", 1f);
-        if (mat.HasProperty("_Blend"))   mat.SetFloat("_Blend",   1f);
-        if (mat.HasProperty("_SrcBlend")) mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
-        if (mat.HasProperty("_DstBlend")) mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
-        if (mat.HasProperty("_ZWrite"))  mat.SetFloat("_ZWrite",   0f);
-        if (mat.HasProperty("_Cull"))    mat.SetFloat("_Cull",     0f);
-        mat.SetOverrideTag("RenderType", "Transparent");
-        mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
-        mat.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
-        mat.EnableKeyword("_ALPHAPREMULTIPLY_ON");
-        mat.DisableKeyword("_ALPHATEST_ON");
-        Color atmoColor = new Color(
-            Mathf.Clamp01(baseColor.r * 0.5f + 0.5f),
-            Mathf.Clamp01(baseColor.g * 0.5f + 0.5f),
-            Mathf.Clamp01(baseColor.b * 0.5f + 0.5f),
-            alpha);
-        if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", atmoColor);
-        if (mat.HasProperty("_Color")) mat.color = atmoColor;
-        mr.material = mat;
+        // Use custom Fresnel shader if available, fall back gracefully
+        var fresnelShader = Shader.Find("Custom/FresnelAtmosphere");
+        if (fresnelShader != null)
+        {
+            var mat = new Material(fresnelShader);
+            Color atmoColor = new Color(
+                Mathf.Clamp01(baseColor.r * 0.6f + 0.4f),
+                Mathf.Clamp01(baseColor.g * 0.6f + 0.4f),
+                Mathf.Clamp01(baseColor.b * 0.7f + 0.3f),
+                1f);
+            mat.SetColor("_AtmoColor",  atmoColor);
+            mat.SetFloat("_FresnelPow", fresnelPow);
+            mat.SetFloat("_Intensity",  intensity);
+            mat.SetFloat("_InnerAlpha", innerAlpha);
+            mr.material = mat;
+        }
+        else
+        {
+            // Fallback: simple additive unlit sphere
+            var shader = Shader.Find("Universal Render Pipeline/Unlit");
+            var mat    = new Material(shader);
+            if (mat.HasProperty("_Surface"))  mat.SetFloat("_Surface",  1f);
+            if (mat.HasProperty("_SrcBlend")) mat.SetFloat("_SrcBlend", (float)UnityEngine.Rendering.BlendMode.SrcAlpha);
+            if (mat.HasProperty("_DstBlend")) mat.SetFloat("_DstBlend", (float)UnityEngine.Rendering.BlendMode.One);
+            if (mat.HasProperty("_ZWrite"))   mat.SetFloat("_ZWrite",   0f);
+            if (mat.HasProperty("_Cull"))     mat.SetFloat("_Cull",     0f);
+            mat.renderQueue = (int)UnityEngine.Rendering.RenderQueue.Transparent;
+            Color atmoColor = new Color(
+                Mathf.Clamp01(baseColor.r * 0.5f + 0.5f),
+                Mathf.Clamp01(baseColor.g * 0.5f + 0.5f),
+                Mathf.Clamp01(baseColor.b * 0.5f + 0.5f),
+                hasAtmo ? 0.06f : 0.025f);
+            if (mat.HasProperty("_BaseColor")) mat.SetColor("_BaseColor", atmoColor);
+            mr.material = mat;
+        }
     }
 
     static Mesh BuildQuadMesh()

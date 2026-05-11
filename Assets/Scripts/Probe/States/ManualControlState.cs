@@ -10,6 +10,8 @@ public class ManualControlState : State
     float scanProgress;
     bool enteredScanRange;
 
+    Vector3 _driftVelocity; // accumulated from gravity + solar wind
+
     const float MoveSpeed  = 50f;
     const float BoostSpeed = 220f;
     const float ScanTime   = 2.5f;
@@ -23,9 +25,10 @@ public class ManualControlState : State
 
     public override void OnEnter()
     {
-        scanTarget      = null;
-        scanProgress    = 0f;
+        scanTarget       = null;
+        scanProgress     = 0f;
         enteredScanRange = false;
+        _driftVelocity   = Vector3.zero;
         CameraController.Instance?.StartFollowing(probe.transform);
         HUDController.Instance?.ShowNotification(
             "[MANUAL] WASD/QE: fly  |  SHIFT: boost  |  apropiati-va de o planeta pentru scan  |  TAB: standby",
@@ -74,11 +77,78 @@ public class ManualControlState : State
             speed *= GetNebulaSpeedMultiplier(probe.transform.position);
             probe.transform.position += move.normalized * speed * Time.deltaTime;
 
-            // Rotate probe only on horizontal plane so camera stays behind, not below
             Vector3 horizontal = new Vector3(move.x, 0f, move.z);
             if (horizontal.sqrMagnitude > 0.01f)
                 probe.transform.forward = Vector3.Slerp(
                     probe.transform.forward, horizontal.normalized, Time.deltaTime * 8f);
+        }
+
+        // ── Environmental forces (gravity + solar wind) ──────────────
+        ApplyEnvironmentalDrift();
+    }
+
+    void ApplyEnvironmentalDrift()
+    {
+        Vector3 force = Vector3.zero;
+
+        // Planetary gravity: clamp mass to 0.5–12 so all planets feel noticeable
+        const float G = 500f;
+        if (PlanetManager.Instance != null)
+        {
+            foreach (var planet in PlanetManager.Instance.planets)
+            {
+                if (planet == null) continue;
+                Vector3 dir = planet.transform.position - probe.transform.position;
+                float distSq = dir.sqrMagnitude;
+                if (distSq > 500f * 500f) continue;
+                float mass = Mathf.Clamp(planet.data.relativeMass, 0.5f, 12f);
+                float f = G * mass / distSq;
+                force += dir.normalized * Mathf.Clamp(f, 0f, 40f);
+            }
+        }
+
+        // Solar wind: pushes away from sun
+        var wind = Object.FindAnyObjectByType<SolarWind>();
+        if (wind != null) force += wind.GetWindForceAt(probe.transform.position);
+
+        _driftVelocity += force * Time.deltaTime;
+
+        // Thrusting bleeds off drift faster (engines fight gravity)
+        float damping = probe.IsThrusting ? 0.90f : 0.988f;
+        _driftVelocity *= Mathf.Pow(damping, Time.deltaTime * 60f);
+        _driftVelocity  = Vector3.ClampMagnitude(_driftVelocity, 60f);
+
+        probe.transform.position += _driftVelocity * Time.deltaTime;
+
+        // Hard pushout: never let probe enter a planet or sun
+        PushOutOfObstacles();
+    }
+
+    void PushOutOfObstacles()
+    {
+        if (PlanetManager.Instance != null)
+            foreach (var planet in PlanetManager.Instance.planets)
+            {
+                if (planet == null) continue;
+                float minDist = planet.radius + 2f;
+                Vector3 diff = probe.transform.position - planet.transform.position;
+                if (diff.sqrMagnitude < minDist * minDist)
+                {
+                    probe.transform.position = planet.transform.position + diff.normalized * minDist;
+                    _driftVelocity = Vector3.Reflect(_driftVelocity, diff.normalized) * 0.3f;
+                }
+            }
+
+        var sun = GameObject.Find("Sun");
+        if (sun != null)
+        {
+            float sunR = sun.transform.localScale.x * 0.5f + 10f;
+            Vector3 diff = probe.transform.position - sun.transform.position;
+            if (diff.sqrMagnitude < sunR * sunR)
+            {
+                probe.transform.position = sun.transform.position + diff.normalized * sunR;
+                _driftVelocity = Vector3.Reflect(_driftVelocity, diff.normalized) * 0.3f;
+            }
         }
     }
 

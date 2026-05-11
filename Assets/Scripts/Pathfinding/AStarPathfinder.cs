@@ -46,6 +46,15 @@ public static class AStarPathfinder
             for (int i = 0; i < count; i++)
                 nodes.Add(p.transform.position + WaypointDirs[i] * d);
         }
+
+        var sunGO = GameObject.Find("Sun");
+        if (sunGO != null)
+        {
+            float d = sunGO.transform.localScale.x * 0.5f * 2.2f;
+            for (int i = 0; i < count; i++)
+                nodes.Add(sunGO.transform.position + WaypointDirs[i] * d);
+        }
+
         return nodes;
     }
 
@@ -71,26 +80,20 @@ public static class AStarPathfinder
     static bool SegmentClear(Vector3 a, Vector3 b, IList<Planet> planets, Settings s, out float penalty)
     {
         penalty = 0f;
-        
-        // 1. Check Nebulae Hazards with dynamic cost sampling
-        var nebulae = Object.FindObjectsByType<ReactiveNebula>(FindObjectsInactive.Exclude);
-        foreach (var n in nebulae)
+
+        var sunGO = GameObject.Find("Sun");
+        if (sunGO != null)
         {
-            // Sample density at 5 points along the segment to find tunnels
-            for (int step = 0; step <= 4; step++)
+            float sunRadius = sunGO.transform.localScale.x * 0.5f;
+            float d = DistancePointToSegment(sunGO.transform.position, a, b);
+            bool sunOwnsEndpoint = Vector3.Distance(sunGO.transform.position, a) < sunRadius
+                                || Vector3.Distance(sunGO.transform.position, b) < sunRadius;
+            if (!sunOwnsEndpoint && d < sunRadius * 1.4f) return false;
+            if (!sunOwnsEndpoint)
             {
-                float t = step / 4f;
-Vector3 samplePos = Vector3.Lerp(a, b, t);
-                float density = n.GetDensityAt(samplePos);
-                
-                if (density > 0.05f)
-                {
-                    penalty += 300f * Mathf.Pow(density, 2f);
-                    // Danger zones (lilac, density > 0.65) get heavy extra penalty
-                    // so autopilot strongly prefers tunnels and open corridors
-                    if (density > 0.65f)
-                        penalty += 900f * Mathf.Pow(density - 0.65f, 1.5f);
-                }
+                float penZone = sunRadius * 3f;
+                if (d < penZone)
+                    penalty += (1f - d / penZone) * 2000f;
             }
         }
 
@@ -100,12 +103,12 @@ Vector3 samplePos = Vector3.Lerp(a, b, t);
         {
             if (p == null) continue;
             Vector3 c = p.transform.position;
-            float surface = p.radius * 1.25f; // Increased safety margin from 1.05
+            float surface = p.radius * 1.25f;
             bool ownsEndpoint = Vector3.Distance(c, a) < surface || Vector3.Distance(c, b) < surface;
 
             float d = DistancePointToSegment(c, a, b);
-            if (!ownsEndpoint && d < p.radius * 1.2f) return false; // Increased clearance
-if (ownsEndpoint) continue;
+            if (!ownsEndpoint && d < p.radius * 1.15f) return false;
+            if (ownsEndpoint) continue;
 
             float zone = p.radius * s.massPenaltyRadiusMultiplier;
             if (d < zone)

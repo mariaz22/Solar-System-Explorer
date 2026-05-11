@@ -16,10 +16,10 @@ public class ReactiveNebula : MonoBehaviour
     public float tunnelThreshold = 0.65f;  // most space is open; only peaks are danger zones
 
     [Header("Colors")]
-    public Color safeColor    = new Color(0.82f, 0.78f, 0.94f, 0.05f); // barely-there lavender
-    public Color calmColor    = new Color(0.78f, 0.80f, 0.95f, 0.10f); // very light blue-purple
-    public Color warningColor = new Color(0.90f, 0.65f, 0.88f, 0.25f); // soft pink-purple
-    public Color dangerColor  = new Color(0.95f, 0.52f, 0.82f, 0.48f); // rosy pink-purple push zones
+    public Color safeColor    = new Color(0.15f, 0.35f, 0.95f, 0.12f); // Deep Space Blue
+    public Color calmColor    = new Color(0.45f, 0.20f, 0.85f, 0.18f); // Nebula Purple
+    public Color warningColor = new Color(0.85f, 0.15f, 0.75f, 0.35f); // Vibrant Magenta
+    public Color dangerColor  = new Color(0.95f, 0.05f, 0.45f, 0.55f); // Hot Pink / Red Energy
 
     [Header("Components")]
     private ParticleSystem outerLayer;
@@ -81,13 +81,14 @@ public class ReactiveNebula : MonoBehaviour
 
         if (sharedNebulaTex == null) sharedNebulaTex = GenerateNebulaTexture();
 
-        outerLayer      = CreateLayer("OuterLayer",     80, 28f, 55f, 0.1f, 0.4f, false);
-        innerLayer      = CreateLayer("InnerLayer",    120, 14f, 28f, 0.2f, 1.0f, false);
-        coreLayer       = CreateLayer("CoreLayer",      60,  8f, 16f, 0.8f, 2.5f, false);
-        sparkLayer      = CreateLayer("SparkLayer",     30,  1.0f, 3.5f, 0f, 0.2f, false);
-        tendrilLayer    = CreateLayer("TendrilLayer",   40,  0.7f, 2.2f, 8f, 20f, true);
-        shockwaveLayer  = CreateLayer("ShockwaveLayer", 20,  3f,  8f, 12f, 28f, true);
-        energyWaveLayer = CreateLayer("EnergyWaveLayer",15, 16f, 32f,  0f, 0.4f, false);
+        float u = radius / 50f; // scale factor relative to original radius=50
+        outerLayer      = CreateLayer("OuterLayer",     80, 28f*u, 55f*u, 0.1f, 0.4f, false);
+        innerLayer      = CreateLayer("InnerLayer",    120, 14f*u, 28f*u, 0.2f, 1.0f, false);
+        coreLayer       = CreateLayer("CoreLayer",      60,  8f*u, 16f*u, 0.8f, 2.5f, false);
+        sparkLayer      = CreateLayer("SparkLayer",     30,  1.0f*u, 3.5f*u, 0f, 0.2f, false);
+        tendrilLayer    = CreateLayer("TendrilLayer",   40,  0.7f*u, 2.2f*u, 8f*u, 20f*u, true);
+        shockwaveLayer  = CreateLayer("ShockwaveLayer", 20,  3f*u,  8f*u, 12f*u, 28f*u, true);
+        energyWaveLayer = CreateLayer("EnergyWaveLayer",15, 16f*u, 32f*u,  0f, 0.4f, false);
         
         ConfigureSparks();
         ConfigureTendrils();
@@ -368,27 +369,39 @@ public class ReactiveNebula : MonoBehaviour
 
     void ApplyEnvironmentalEffects(float distance)
     {
+        if (playerProbe == null) return;
+        // Only disturb probe in manual control — autopilot handles its own pathfinding
+        if (!(playerProbe.FSM?.CurrentState is ManualControlState)) return;
+
         if (distance < radius)
         {
             float localDensity = GetDensityAt(playerProbe.transform.position);
+            if (localDensity < 0.01f) return;
+
             Vector3 centerDir = (playerProbe.transform.position - transform.position).normalized;
             Vector3 swirlDir  = Vector3.Cross(centerDir, Vector3.up).normalized;
 
             float pushForce, swirlForce;
             if (localDensity > 0.65f)
             {
-                // Pink-purple zone: moderate push, noticeable but beatable with WASD
                 float t = (localDensity - 0.65f) / 0.35f;
-                pushForce  = 4f + t * 8f;   // max 12 units/s
-                swirlForce = 5f + t * 5f;   // max 10 units/s
+                pushForce  = 4f + t * 8f;
+                swirlForce = 5f + t * 5f;
             }
             else
             {
-                // Open space inside nebula: barely felt, purely visual
                 pushForce  = localDensity * 1.5f;
                 swirlForce = localDensity * 2f;
             }
-            playerProbe.transform.position += (centerDir * pushForce + swirlDir * swirlForce) * Time.deltaTime;
+
+            float densityFactor = Mathf.Pow(localDensity, 2.0f);
+            Vector3 shake = new Vector3(
+                Mathf.PerlinNoise(Time.time * 22f, 1.5f) - 0.5f,
+                Mathf.PerlinNoise(Time.time * 22f, 2.5f) - 0.5f,
+                Mathf.PerlinNoise(Time.time * 22f, 3.5f) - 0.5f
+            ) * (4f * densityFactor);
+
+            playerProbe.transform.position += (centerDir * pushForce + swirlDir * swirlForce + shake) * Time.deltaTime;
         }
     }
 

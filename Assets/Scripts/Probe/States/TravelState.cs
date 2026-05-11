@@ -5,6 +5,15 @@ public class TravelState : State
     readonly ProbeController probe;
     Vector3 currentVelocity;
 
+    static float GetNebulaSlowdown(Vector3 pos)
+    {
+        float maxDensity = 0f;
+        var nebulae = Object.FindObjectsByType<ReactiveNebula>(FindObjectsInactive.Exclude);
+        foreach (var n in nebulae)
+            maxDensity = Mathf.Max(maxDensity, n.GetDensityAt(pos));
+        return Mathf.Lerp(1f, 0.65f, maxDensity);
+    }
+
     public TravelState(ProbeController probe) { this.probe = probe; }
 
     public override void OnEnter()
@@ -19,35 +28,39 @@ public class TravelState : State
 
     public override void OnUpdate()
     {
-        if (probe.Path == null || probe.WaypointIndex >= probe.Path.Count) return;
+        if (probe.Path == null || probe.WaypointIndex >= probe.Path.Count)
+        {
+            probe.FSM.ChangeState(new ScanState(probe));
+            return;
+        }
 
         Vector3 currentPos = probe.transform.position;
         Vector3 next = (probe.WaypointIndex == probe.Path.Count - 1 && probe.Target != null)
-            ? probe.Target.transform.position - (probe.Target.transform.position - currentPos).normalized * (probe.Target.radius + 1.5f)
+            ? probe.Target.transform.position
+              - (probe.Target.transform.position - currentPos).normalized
+              * (probe.Target.radius + 12f)
             : probe.Path[probe.WaypointIndex];
 
-        // 1. Calculate desired velocity
+        // 1. Desired velocity toward next waypoint
         Vector3 desiredDir = (next - currentPos).normalized;
-        Vector3 targetVelocity = desiredDir * probe.speed;
+        float slowdown = GetNebulaSlowdown(currentPos);
+        Vector3 targetVelocity = desiredDir * (probe.speed * slowdown);
 
-        // 2. Obstacle Avoidance (Raycast/SphereCast)
-        if (Physics.SphereCast(currentPos, probe.avoidanceRadius, probe.transform.forward, out RaycastHit hit, probe.lookAheadDistance, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Collide))
+        // 2. Obstacle avoidance via SphereCast (ignore triggers so meteors/asteroids don't deflect autopilot)
+        if (Physics.SphereCast(currentPos, probe.avoidanceRadius, probe.transform.forward,
+            out RaycastHit hit, probe.lookAheadDistance,
+            Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
         {
-            // If we hit something that is NOT our target AND NOT the planet we just left
-            bool isTarget = probe.Target != null && hit.collider.gameObject == probe.Target.gameObject;
+            bool isTarget      = probe.Target      != null && hit.collider.gameObject == probe.Target.gameObject;
             bool isLastScanned = probe.LastScanned != null && hit.collider.gameObject == probe.LastScanned.gameObject;
-            
+
             if (!isTarget && !isLastScanned)
             {
-                // Calculate avoidance force
                 Vector3 avoidDir = Vector3.Reflect(probe.transform.forward, hit.normal);
                 Vector3 pushAway = (currentPos - hit.point).normalized;
-                Vector3 combinedAvoid = (avoidDir + pushAway).normalized;
-                
-                targetVelocity += combinedAvoid * probe.avoidanceStrength;
-                
-                // Emergency transition if extremely close
-                if (hit.distance < 1.5f)
+                targetVelocity  += (avoidDir + pushAway * 2f).normalized * probe.avoidanceStrength;
+
+                if (hit.distance < probe.avoidanceRadius * 0.6f)
                 {
                     probe.FSM.ChangeState(new AvoidCollisionState(probe));
                     return;
@@ -55,25 +68,48 @@ public class TravelState : State
             }
         }
 
-        // 3. Smooth velocity and apply movement
-        currentVelocity = Vector3.Lerp(currentVelocity, targetVelocity, Time.deltaTime * 3f);
+        // 3. Smooth velocity and move
+        currentVelocity = Vector3.Lerp(currentVelocity, targetVelocity, Time.deltaTime * 4f);
         probe.transform.position += currentVelocity * Time.deltaTime;
 
         // 4. Smooth rotation
         if (currentVelocity.sqrMagnitude > 0.01f)
         {
             Quaternion targetRot = Quaternion.LookRotation(currentVelocity.normalized);
-            probe.transform.rotation = Quaternion.Slerp(probe.transform.rotation, targetRot, Time.deltaTime * 4f);
+            probe.transform.rotation = Quaternion.Slerp(probe.transform.rotation, targetRot, Time.deltaTime * 5f);
         }
 
-        // 5. Waypoint logic
-        if (Vector3.Distance(currentPos, next) < probe.arrivalThreshold + 0.5f)
+        // 5. Hard push-out: never let probe enter a planet or sun
+        PushOutOfObstacles();
+
+        // 6. Waypoint advance
+        if (Vector3.Distance(currentPos, next) < probe.arrivalThreshold)
         {
             probe.WaypointIndex++;
             if (probe.WaypointIndex >= probe.Path.Count)
-            {
                 probe.FSM.ChangeState(new ScanState(probe));
+        }
+    }
+
+    void PushOutOfObstacles()
+    {
+        if (PlanetManager.Instance != null)
+            foreach (var planet in PlanetManager.Instance.planets)
+            {
+                if (planet == null) continue;
+                float minDist = planet.radius + 3f;
+                Vector3 diff = probe.transform.position - planet.transform.position;
+                if (diff.sqrMagnitude < minDist * minDist)
+                    probe.transform.position = planet.transform.position + diff.normalized * minDist;
             }
+
+        var sun = GameObject.Find("Sun");
+        if (sun != null)
+        {
+            float sunR = sun.transform.localScale.x * 0.5f + 10f;
+            Vector3 diff = probe.transform.position - sun.transform.position;
+            if (diff.sqrMagnitude < sunR * sunR)
+                probe.transform.position = sun.transform.position + diff.normalized * sunR;
         }
     }
 

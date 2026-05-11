@@ -9,19 +9,19 @@ public class RandomEventManager : MonoBehaviour
     public float maxInterval = 50f;
 
     [Header("Solar Storm")]
-    public float stormPushForce = 18f;
+    public float stormPushForce = 8f;
     public float stormDuration = 3f;
 
     [Header("Rogue Asteroid")]
     public float asteroidSpeed = 55f;
     public float asteroidProximityRadius = 12f;
-    public float asteroidPushForce = 8f;
+    public float asteroidPushForce = 4f;
 
     [Header("Meteor Shower")]
     public int meteorCount = 20;
     public float meteorSpeed = 130f;
     public float meteorProximityRadius = 10f;
-    public float meteorPushForce = 6f;
+    public float meteorPushForce = 3f;
     public float showerDuration = 10f;
 
     ProbeController probe;

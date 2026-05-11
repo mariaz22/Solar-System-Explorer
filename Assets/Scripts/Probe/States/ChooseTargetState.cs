@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 public class ChooseTargetState : State
@@ -26,23 +27,22 @@ public class ChooseTargetState : State
         TargetIndicator.Instance?.SetTarget(probe.Target);
 
         Vector3 dir = (probe.Target.transform.position - probe.transform.position).normalized;
-        Vector3 approach = probe.Target.transform.position - dir * (probe.Target.radius + 1f);
+        Vector3 approach = probe.Target.transform.position - dir * (probe.Target.radius + 12f);
 
         probe.Path = AStarPathfinder.FindPath(probe.transform.position, approach, planets);
 
-        if (probe.Path != null && probe.Path.Count >= 2)
+        if (probe.Path == null || probe.Path.Count < 2)
         {
-            probe.WaypointIndex = 1;
-            probe.FSM.ChangeState(new TravelState(probe));
+            // Fallback: direct straight-line path so probe never gets stuck
+            probe.Path = new List<Vector3> { probe.transform.position, approach };
+            Debug.LogWarning($"[FSM] A* failed for {probe.Target.data.planetName} — using direct path");
         }
-        else
-        {
-            Debug.LogWarning($"[FSM] No path found to {probe.Target.data.planetName}");
-            probe.FSM.ChangeState(new IdleState(probe));
-        }
+
+        probe.WaypointIndex = 1;
+        probe.FSM.ChangeState(new TravelState(probe));
     }
 
-    void AutoSelectTarget(System.Collections.Generic.List<Planet> planets)
+    void AutoSelectTarget(List<Planet> planets)
     {
         Planet best = null;
         float bestScore = float.MinValue;
@@ -65,7 +65,9 @@ public class ChooseTargetState : State
         }
 
         probe.Target = best;
-        probe.TargetReason = best != null ? $"Next target: {best.data.planetName} — Reason: closest unexplored" : "";
+        probe.TargetReason = best != null
+            ? $"Next target: {best.data.planetName} — Reason: closest unexplored"
+            : "";
 
         if (probe.TargetReason != "")
             Debug.Log($"[FSM] {probe.TargetReason}");
