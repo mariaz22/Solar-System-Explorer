@@ -34,6 +34,16 @@ public class TravelState : State
             return;
         }
 
+        // Target was destroyed (consumed by sun) mid-journey — replan
+        if (probe.Target != null && !probe.Target.gameObject.activeSelf)
+        {
+            probe.Target = null;
+            probe.Path   = null;
+            MissionLog.Instance?.AddEntry("Target planet destroyed — replanning.", new Color(1f, 0.5f, 0.2f));
+            probe.FSM.ChangeState(new ChooseTargetState(probe));
+            return;
+        }
+
         Vector3 currentPos = probe.transform.position;
         Vector3 next = (probe.WaypointIndex == probe.Path.Count - 1 && probe.Target != null)
             ? probe.Target.transform.position
@@ -46,15 +56,16 @@ public class TravelState : State
         float slowdown = GetNebulaSlowdown(currentPos);
         Vector3 targetVelocity = desiredDir * (probe.speed * slowdown);
 
-        // 2. Obstacle avoidance via SphereCast (ignore triggers so meteors/asteroids don't deflect autopilot)
+        // 2. Obstacle avoidance via SphereCast (ignore triggers — meteors/nebulae)
         if (Physics.SphereCast(currentPos, probe.avoidanceRadius, probe.transform.forward,
             out RaycastHit hit, probe.lookAheadDistance,
             Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
         {
             bool isTarget      = probe.Target      != null && hit.collider.gameObject == probe.Target.gameObject;
             bool isLastScanned = probe.LastScanned != null && hit.collider.gameObject == probe.LastScanned.gameObject;
+            bool isSun         = hit.collider.name == "Sun"; // PushOutOfObstacles handles sun clearance
 
-            if (!isTarget && !isLastScanned)
+            if (!isTarget && !isLastScanned && !isSun)
             {
                 Vector3 avoidDir = Vector3.Reflect(probe.transform.forward, hit.normal);
                 Vector3 pushAway = (currentPos - hit.point).normalized;
@@ -62,6 +73,7 @@ public class TravelState : State
 
                 if (hit.distance < probe.avoidanceRadius * 0.6f)
                 {
+                    probe.AvoidRetryCount++;
                     probe.FSM.ChangeState(new AvoidCollisionState(probe));
                     return;
                 }
@@ -86,6 +98,7 @@ public class TravelState : State
         if (Vector3.Distance(currentPos, next) < probe.arrivalThreshold)
         {
             probe.WaypointIndex++;
+            probe.AvoidRetryCount = 0; // made progress — reset retry budget
             if (probe.WaypointIndex >= probe.Path.Count)
                 probe.FSM.ChangeState(new ScanState(probe));
         }
@@ -102,6 +115,15 @@ public class TravelState : State
                 if (diff.sqrMagnitude < minDist * minDist)
                     probe.transform.position = planet.transform.position + diff.normalized * minDist;
             }
+
+        foreach (var moon in MoonTag.All)
+        {
+            float radius = moon.transform.localScale.x * 0.5f;
+            float minDist = radius + 1.5f;
+            Vector3 diff = probe.transform.position - moon.transform.position;
+            if (diff.sqrMagnitude < minDist * minDist)
+                probe.transform.position = moon.transform.position + diff.normalized * minDist;
+        }
 
         var sun = GameObject.Find("Sun");
         if (sun != null)

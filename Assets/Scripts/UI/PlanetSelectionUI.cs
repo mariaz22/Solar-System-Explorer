@@ -109,17 +109,29 @@ public class PlanetSelectionUI : MonoBehaviour
             ? $"\n<i>{probe.TargetReason}</i>"
             : "";
 
+        bool destroyed = !selected.gameObject.activeSelf;
+        string status  = destroyed ? "<color=#ff4444>Destroyed</color>"
+                       : d.explored ? "Explored"
+                       : "Unexplored";
+
         infoText.text =
             $"<b>{d.planetName}</b>\n" +
             $"Mass (Earth=1): {d.relativeMass:0.##}\n" +
             $"Distance from Sun (AU): {d.distanceFromSun:0.##}\n" +
-            $"Status: {(d.explored ? "Explored" : "Unexplored")}" +
+            $"Status: {status}" +
             probeStatus;
     }
 
     void OnSendProbe()
     {
         if (probe == null || selected == null) return;
+        if (!selected.gameObject.activeSelf)
+        {
+            HUDController.Instance?.ShowNotification(
+                $"[ERROR] {selected.data.planetName} was destroyed — cannot scan.",
+                new Color(1f, 0.3f, 0.3f));
+            return;
+        }
         probe.SetTarget(selected);
     }
 }

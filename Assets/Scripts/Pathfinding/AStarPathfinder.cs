@@ -6,60 +6,121 @@ public static class AStarPathfinder
     [System.Serializable]
     public class Settings
     {
-        public int waypointsPerPlanet = 12; // Increased from 6
-        public float waypointDistanceMultiplier = 3.0f; // Increased from 2.5
-        public float massPenaltyRadiusMultiplier = 6f; // Increased from 5
-        public float massPenaltyStrength = 3f; // Increased from 2
+        public int waypointsPerPlanet = 24; 
+        public float[] shellMultipliers = { 2.2f, 4.0f, 6.5f };
+        public float massPenaltyRadiusMultiplier = 8f;
+        public float massPenaltyStrength = 5f;
     }
 
-    static readonly Vector3[] WaypointDirs =
+    static Vector3[] _waypointDirs;
+    static Vector3[] WaypointDirs
     {
-        Vector3.up, Vector3.down,
-        Vector3.left, Vector3.right,
-        Vector3.forward, Vector3.back,
-        (Vector3.up + Vector3.right).normalized,
-        (Vector3.up + Vector3.left).normalized,
-        (Vector3.down + Vector3.right).normalized,
-        (Vector3.down + Vector3.left).normalized,
-        (Vector3.forward + Vector3.up).normalized,
-        (Vector3.back + Vector3.up).normalized
-    };
+        get
+        {
+            if (_waypointDirs == null) _waypointDirs = GenerateDirections(32);
+            return _waypointDirs;
+        }
+    }
+
+    static Vector3[] GenerateDirections(int count)
+    {
+        var dirs = new List<Vector3>();
+        float goldenRatio = (1 + Mathf.Sqrt(5)) / 2;
+        for (int i = 0; i < count; i++)
+        {
+            float theta = 2 * Mathf.PI * i / goldenRatio;
+            float phi = Mathf.Acos(1 - 2 * (i + 0.5f) / count);
+            dirs.Add(new Vector3(Mathf.Cos(theta) * Mathf.Sin(phi), Mathf.Sin(theta) * Mathf.Sin(phi), Mathf.Cos(phi)));
+        }
+        return dirs.ToArray();
+    }
 
     public static List<Vector3> FindPath(Vector3 start, Vector3 end, IList<Planet> planets, Settings s = null)
     {
         s ??= new Settings();
-        var nodes = BuildNodes(start, end, planets, s);
-        var edges = BuildEdges(nodes, planets, s);
-        return AStar(nodes, edges, 0, 1);
+
+        // Cache sun once — avoid 57k+ GameObject.Find calls inside SegmentClear
+        var sunGO = GameObject.Find("Sun");
+
+        Vector3 safeStart = EnsureSafePoint(start, planets, s, sunGO);
+        Vector3 safeEnd   = EnsureSafePoint(end,   planets, s, sunGO);
+
+        var nodes = BuildNodes(safeStart, safeEnd, planets, s, sunGO);
+
+        var edges = BuildEdges(nodes, planets, s, false, sunGO);
+        var path  = AStar(nodes, edges, 0, 1);
+
+        if (path.Count == 0)
+        {
+            edges = BuildEdges(nodes, planets, s, true, sunGO);
+            path  = AStar(nodes, edges, 0, 1);
+        }
+
+        return path;
     }
 
-    static List<Vector3> BuildNodes(Vector3 start, Vector3 end, IList<Planet> planets, Settings s)
+    static Vector3 EnsureSafePoint(Vector3 p, IList<Planet> planets, Settings s, GameObject sunGO)
+    {
+        if (sunGO != null)
+        {
+            float sunRadius = sunGO.transform.localScale.x * 0.5f;
+            float killZone = sunRadius * 1.15f;
+            Vector3 diff = p - sunGO.transform.position;
+            if (diff.magnitude < killZone) return sunGO.transform.position + diff.normalized * (killZone + 5f);
+        }
+
+        if (planets != null)
+        {
+            foreach (var planet in planets)
+            {
+                if (planet == null) continue;
+                float killZone = planet.radius * 1.05f;
+                Vector3 diff = p - planet.transform.position;
+                if (diff.magnitude < killZone) return planet.transform.position + diff.normalized * (killZone + 2f);
+            }
+        }
+        return p;
+    }
+
+    static List<Vector3> BuildNodes(Vector3 start, Vector3 end, IList<Planet> planets, Settings s, GameObject sunGO)
     {
         var nodes = new List<Vector3> { start, end };
         if (planets == null) return nodes;
 
-        int count = Mathf.Min(s.waypointsPerPlanet, WaypointDirs.Length);
         foreach (var p in planets)
         {
             if (p == null) continue;
-            float d = p.radius * s.waypointDistanceMultiplier;
-            for (int i = 0; i < count; i++)
-                nodes.Add(p.transform.position + WaypointDirs[i] * d);
+            foreach (float mult in s.shellMultipliers)
+            {
+                float d = p.radius * mult;
+                int count = 12;
+                for (int i = 0; i < count; i++)
+                {
+                    int dirIdx = (i * 3) % WaypointDirs.Length;
+                    nodes.Add(p.transform.position + WaypointDirs[dirIdx] * d);
+                }
+            }
         }
 
-        var sunGO = GameObject.Find("Sun");
         if (sunGO != null)
         {
-            float d = sunGO.transform.localScale.x * 0.5f * 2.2f;
-            for (int i = 0; i < count; i++)
-                nodes.Add(sunGO.transform.position + WaypointDirs[i] * d);
+            float sunRadius = sunGO.transform.localScale.x * 0.5f;
+            foreach (float mult in new float[] { 2.2f, 3.5f, 5.5f })
+            {
+                float d = sunRadius * mult;
+                for (int i = 0; i < 16; i++)
+                {
+                    int dirIdx = (i * 2) % WaypointDirs.Length;
+                    nodes.Add(sunGO.transform.position + WaypointDirs[dirIdx] * d);
+                }
+            }
         }
 
         return nodes;
     }
 
     static Dictionary<int, List<(int target, float cost)>> BuildEdges(
-        List<Vector3> nodes, IList<Planet> planets, Settings s)
+        List<Vector3> nodes, IList<Planet> planets, Settings s, bool permissive, GameObject sunGO)
     {
         var graph = new Dictionary<int, List<(int, float)>>();
         for (int i = 0; i < nodes.Count; i++) graph[i] = new List<(int, float)>();
@@ -68,7 +129,7 @@ public static class AStarPathfinder
         {
             for (int j = i + 1; j < nodes.Count; j++)
             {
-                if (!SegmentClear(nodes[i], nodes[j], planets, s, out float penalty)) continue;
+                if (!SegmentClear(nodes[i], nodes[j], planets, s, out float penalty, permissive, sunGO)) continue;
                 float cost = Vector3.Distance(nodes[i], nodes[j]) + penalty;
                 graph[i].Add((j, cost));
                 graph[j].Add((i, cost));
@@ -77,23 +138,45 @@ public static class AStarPathfinder
         return graph;
     }
 
-    static bool SegmentClear(Vector3 a, Vector3 b, IList<Planet> planets, Settings s, out float penalty)
+    static bool SegmentClear(Vector3 a, Vector3 b, IList<Planet> planets, Settings s, out float penalty, bool permissive, GameObject sunGO)
     {
         penalty = 0f;
+        float killMult = permissive ? 1.02f : 1.15f;
+        float planetKillMult = permissive ? 1.01f : 1.06f;
 
-        var sunGO = GameObject.Find("Sun");
         if (sunGO != null)
         {
             float sunRadius = sunGO.transform.localScale.x * 0.5f;
             float d = DistancePointToSegment(sunGO.transform.position, a, b);
-            bool sunOwnsEndpoint = Vector3.Distance(sunGO.transform.position, a) < sunRadius
-                                || Vector3.Distance(sunGO.transform.position, b) < sunRadius;
-            if (!sunOwnsEndpoint && d < sunRadius * 1.4f) return false;
-            if (!sunOwnsEndpoint)
+            
+            float killZone = sunRadius * killMult; 
+            float bufferZone = sunRadius * (permissive ? 1.1f : 1.5f);
+
+            bool aInside = Vector3.Distance(sunGO.transform.position, a) < bufferZone;
+            bool bInside = Vector3.Distance(sunGO.transform.position, b) < bufferZone;
+            
+            if (!(aInside || bInside) && d < killZone) return false;
+            
+            float penaltyZone = sunRadius * 4f;
+            if (d < penaltyZone)
             {
-                float penZone = sunRadius * 3f;
-                if (d < penZone)
-                    penalty += (1f - d / penZone) * 2000f;
+                float t = 1f - (d / penaltyZone);
+                penalty += t * t * 5000f;
+            }
+        }
+
+        if (!permissive)
+        {
+            foreach (var moon in MoonTag.All)
+            {
+                float moonRadius = moon.transform.localScale.x * 0.5f;
+                float d = DistancePointToSegment(moon.transform.position, a, b);
+                float avoidRadius = moonRadius * 2.5f;
+                if (d < avoidRadius)
+                {
+                    float t = 1f - (d / avoidRadius);
+                    penalty += t * 1500f; 
+                }
             }
         }
 
@@ -103,18 +186,22 @@ public static class AStarPathfinder
         {
             if (p == null) continue;
             Vector3 c = p.transform.position;
-            float surface = p.radius * 1.25f;
-            bool ownsEndpoint = Vector3.Distance(c, a) < surface || Vector3.Distance(c, b) < surface;
+            float killZone = p.radius * planetKillMult;
+            float bufferZone = p.radius * (permissive ? 1.05f : 1.35f);
+
+            bool aInside = Vector3.Distance(c, a) < bufferZone;
+            bool bInside = Vector3.Distance(c, b) < bufferZone;
 
             float d = DistancePointToSegment(c, a, b);
-            if (!ownsEndpoint && d < p.radius * 1.15f) return false;
-            if (ownsEndpoint) continue;
+            
+            if (!(aInside || bInside) && d < killZone) return false;
 
             float zone = p.radius * s.massPenaltyRadiusMultiplier;
             if (d < zone)
             {
                 float t = 1f - (d / zone);
-                penalty += t * Mathf.Max(0.1f, p.data.relativeMass) * s.massPenaltyStrength;
+                float massImpact = Mathf.Max(0.1f, p.data.relativeMass);
+                penalty += t * massImpact * s.massPenaltyStrength * (permissive ? 2f : 15f);
             }
         }
         return true;

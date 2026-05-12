@@ -4,6 +4,13 @@ using UnityEngine;
 using UnityEngine.Rendering.Universal;
 using UnityEngine.UI;
 
+public class MoonTag : MonoBehaviour
+{
+    public static readonly System.Collections.Generic.List<MoonTag> All = new();
+    void OnEnable()  => All.Add(this);
+    void OnDisable() => All.Remove(this);
+}
+
 [DefaultExecutionOrder(-100)]
 public class SceneBootstrap : MonoBehaviour
 {
@@ -12,7 +19,7 @@ public class SceneBootstrap : MonoBehaviour
     public float probeStartOffset = 10f;
 
     [Header("Planet sizes (diameter in world units)")]
-    public float sunScale = 220f;
+    public float sunScale = 140f;
     public float minPlanetScale = 3.0f;
     public float massToScale = 2.5f;
 
@@ -43,7 +50,7 @@ public class SceneBootstrap : MonoBehaviour
     void Awake()
     {
         // Force override any stale Inspector-serialized values
-        sunScale = 220f;
+        sunScale = 140f;
 
         // Reposition & scale nebulae around the solar system before their Awake() runs
         var nebulaPositions = new Vector3[]
@@ -83,9 +90,9 @@ public class SceneBootstrap : MonoBehaviour
             var sunLight = sun.GetComponent<Light>();
             if (sunLight == null) sunLight = sun.AddComponent<Light>();
             sunLight.type = LightType.Point;
-            sunLight.color = new Color(1f, 0.96f, 0.82f);
-            sunLight.intensity = 65f;
-            sunLight.range = 8000f;
+            sunLight.color = new Color(1f, 0.98f, 0.96f);
+            sunLight.intensity = 200_000f;
+            sunLight.range = 4000f;
             sunLight.shadows = LightShadows.None;
             }
 
@@ -101,25 +108,25 @@ public class SceneBootstrap : MonoBehaviour
                 }
 
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
-        RenderSettings.ambientLight = new Color(0.05f, 0.05f, 0.08f); // Much darker ambient
+        RenderSettings.ambientLight = new Color(0.13f, 0.13f, 0.16f);
 
-        // Subtle fill light from camera direction so planet textures are always visible
+        // Very dim fill lights — just enough to prevent pitch-black shadows.
+        // Kept low so the sun Point Light (200k+ intensity) is the dominant directional source.
         var fillGO = new GameObject("FillLight");
         fillGO.transform.SetParent(transform, false);
         var fill = fillGO.AddComponent<Light>();
         fill.type = LightType.Directional;
         fill.color = new Color(0.75f, 0.80f, 1.0f);
-        fill.intensity = 0.45f;
+        fill.intensity = 0.025f;
         fill.shadows = LightShadows.None;
         fillGO.transform.rotation = Quaternion.Euler(40f, 18f, 0f);
 
-        // Second fill from opposite side for wrap-around lighting
         var fill2GO = new GameObject("FillLight2");
         fill2GO.transform.SetParent(transform, false);
         var fill2 = fill2GO.AddComponent<Light>();
         fill2.type = LightType.Directional;
         fill2.color = new Color(0.40f, 0.45f, 0.65f);
-        fill2.intensity = 0.15f;
+        fill2.intensity = 0.008f;
         fill2.shadows = LightShadows.None;
         fill2GO.transform.rotation = Quaternion.Euler(145f, 195f, 0f);
 
@@ -449,9 +456,13 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
 
             var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
             go.name = $"{planet.data.planetName}_Moon{i + 1}";
+            go.AddComponent<MoonTag>();
             go.transform.position = worldPos;
             go.transform.localScale = Vector3.one * moonSize;
-            Destroy(go.GetComponent<SphereCollider>());
+            
+            // We keep the collider but set it to a trigger if we want to avoid physics nudges
+            var sc = go.GetComponent<SphereCollider>();
+            if (sc != null) sc.isTrigger = true;
 
             // Rocky moon material — use Unlit so it's always visible regardless of light distance
             var mr  = go.GetComponent<MeshRenderer>();

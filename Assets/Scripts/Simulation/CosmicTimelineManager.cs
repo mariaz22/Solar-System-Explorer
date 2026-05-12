@@ -11,11 +11,14 @@ public enum SolarStage
     WhiteDwarf       // 9.5 - 13 Gyr
 }
 
+[ExecuteAlways]
 public class CosmicTimelineManager : MonoBehaviour
 {
     public static CosmicTimelineManager Instance { get; private set; }
 
-    public float cosmicTimeGyr { get; private set; } = 0f;
+    [SerializeField, Range(0f, 13f)] private float _editorPreviewGyr = 4.5f;
+
+    public float cosmicTimeGyr { get; private set; } = 4.5f;
 
     public event Action<float, SolarStage> OnCosmicTimeChanged;
 
@@ -51,8 +54,24 @@ public class CosmicTimelineManager : MonoBehaviour
         Instance = this;
     }
 
-    public SolarStage GetCurrentStage()
+    void OnEnable()
     {
+        Instance = this;
+    }
+
+    void Update()
+    {
+        if (!Application.isPlaying)
+        {
+            if (Mathf.Abs(cosmicTimeGyr - _editorPreviewGyr) > 0.001f)
+            {
+                SetCosmicTime(_editorPreviewGyr);
+            }
+        }
+    }
+
+    public SolarStage GetCurrentStage()
+{
         foreach (var (start, end, stage) in Stages)
             if (cosmicTimeGyr < end) return stage;
         return SolarStage.WhiteDwarf;
@@ -79,7 +98,10 @@ public class CosmicTimelineManager : MonoBehaviour
         if (newStage != previousStage)
         {
             if (newStage > previousStage && StageMessages.TryGetValue(newStage, out var sm))
+            {
                 MissionLog.Instance?.AddEntry(sm.message, sm.color);
+                HUDController.Instance?.FlashScreen(sm.color);
+            }
             previousStage = newStage;
         }
 

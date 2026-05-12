@@ -3,42 +3,61 @@ using UnityEngine;
 public class AvoidCollisionState : State
 {
     readonly ProbeController probe;
-    float timer;
+    float   timer;
     Vector3 avoidDir;
-    const float AvoidDuration = 1.5f;
+    const float AvoidDuration = 3.0f;
 
     public AvoidCollisionState(ProbeController probe) { this.probe = probe; }
 
     public override void OnEnter()
     {
         timer = 0f;
-        // Find a direction perpendicular to the collision
-        if (Physics.Raycast(probe.transform.position, probe.transform.forward, out RaycastHit hit, 200f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+
+        if (Physics.Raycast(probe.transform.position, probe.transform.forward,
+            out RaycastHit hit, 200f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
         {
-            avoidDir = Vector3.Cross(hit.normal, Vector3.up).normalized;
-            if (avoidDir.sqrMagnitude < 0.1f) avoidDir = Vector3.Cross(hit.normal, Vector3.right).normalized;
-            if (avoidDir.sqrMagnitude < 0.1f) avoidDir = probe.transform.right;
+            Vector3 toObstacle    = (hit.point - probe.transform.position).normalized;
+            Vector3 awayFromCenter = -toObstacle;
+            Vector3 perpA = Vector3.Cross(toObstacle, Vector3.up).normalized;
+            Vector3 perpB = Vector3.Cross(toObstacle, Vector3.right).normalized;
+            Vector3 perp  = Mathf.Abs(Vector3.Dot(perpA, Vector3.up)) > 0.1f ? perpA : perpB;
+
+            // Alternate side each retry to break symmetry
+            if (probe.AvoidRetryCount % 2 == 1) perp = -perp;
+
+            avoidDir = (perp * 0.7f + awayFromCenter * 0.3f).normalized;
         }
         else
         {
-            avoidDir = probe.transform.right;
+            // Alternate left/right AND up/down to prevent drift accumulating in one direction
+            float ySign = (probe.AvoidRetryCount % 4 < 2) ? 0.2f : -0.2f;
+            avoidDir = (probe.AvoidRetryCount % 2 == 0)
+                ? ( probe.transform.right + Vector3.up * ySign).normalized
+                : (-probe.transform.right + Vector3.up * ySign).normalized;
         }
-        Debug.Log("[FSM] Avoiding collision...");
+
+        Debug.Log($"[FSM] Avoiding collision... (attempt {probe.AvoidRetryCount})");
     }
 
     public override void OnUpdate()
     {
-        probe.transform.position += (avoidDir + probe.transform.forward * 0.3f).normalized * probe.speed * 0.9f * Time.deltaTime;
-        probe.transform.forward = Vector3.Slerp(probe.transform.forward, avoidDir, Time.deltaTime * 8f);
+        probe.transform.position += avoidDir * probe.speed * 0.85f * Time.deltaTime;
+        probe.transform.forward   = Vector3.Slerp(probe.transform.forward, avoidDir, Time.deltaTime * 6f);
 
         timer += Time.deltaTime;
+        if (timer < AvoidDuration) return;
 
-        if (timer >= AvoidDuration)
+        probe.Path = null;
+
+        if (probe.AvoidRetryCount >= 3)
         {
-            // Replan from current position so we don't loop back into the same obstacle
-            probe.Path = null;
-            probe.FSM.ChangeState(new ChooseTargetState(probe));
+            Debug.LogWarning($"[FSM] Giving up on {probe.Target?.data.planetName} after {probe.AvoidRetryCount} retries — skipping.");
+            probe.LastFailedTarget  = probe.Target;
+            probe.Target            = null;
+            probe.AvoidRetryCount   = 0;
         }
+
+        probe.FSM.ChangeState(new ChooseTargetState(probe));
     }
 
     public override void OnExit() { }

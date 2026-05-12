@@ -139,6 +139,18 @@ public class ManualControlState : State
                 }
             }
 
+        foreach (var moon in MoonTag.All)
+        {
+            float radius = moon.transform.localScale.x * 0.5f;
+            float minDist = radius + 1.2f;
+            Vector3 diff = probe.transform.position - moon.transform.position;
+            if (diff.sqrMagnitude < minDist * minDist)
+            {
+                probe.transform.position = moon.transform.position + diff.normalized * minDist;
+                _driftVelocity = Vector3.Reflect(_driftVelocity, diff.normalized) * 0.3f;
+            }
+        }
+
         var sun = GameObject.Find("Sun");
         if (sun != null)
         {

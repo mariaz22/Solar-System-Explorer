@@ -353,6 +353,14 @@ public class HUDController : MonoBehaviour
         }
 
         elapsed = 0f;
+
+        // Reset cosmic timeline to present day (4.5 Gyr)
+        var ctUI = Object.FindAnyObjectByType<CosmicTimelineUIController>();
+        if (ctUI != null && ctUI.slider != null)
+            ctUI.slider.value = 4.5f;
+        else
+            CosmicTimelineManager.Instance?.SetCosmicTime(4.5f);
+
         MissionLog.Instance?.AddEntry("Mission reset. All planets unexplored.", new Color(1f, 0.4f, 0.4f));
         ShowNotification("[RESET] Misiune resetata — toate planetele sunt din nou neexplorate!", new Color(1f, 0.45f, 0.45f), 4f);
         FlashScreen(new Color(0.8f, 0.1f, 0.1f));

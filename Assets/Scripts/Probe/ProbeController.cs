@@ -22,6 +22,8 @@ public class ProbeController : MonoBehaviour
     public int WaypointIndex { get; set; }
     public PathVisualizer PathVis { get; private set; }
     public Vector3 Origin { get; private set; }
+    public int AvoidRetryCount { get; set; }
+    public Planet LastFailedTarget { get; set; }
 
     void Awake()
     {
