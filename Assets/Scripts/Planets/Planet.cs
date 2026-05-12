@@ -50,4 +50,11 @@ public class Planet : MonoBehaviour
         runtimeMaterial.EnableKeyword("_EMISSION");
         runtimeMaterial.SetColor("_EmissionColor", new Color(0f, 0.5f, 0.25f) * 1.2f);
     }
+
+    public void ResetExplored()
+    {
+        data.explored = false;
+        if (runtimeMaterial == null || !runtimeMaterial.HasProperty("_EmissionColor")) return;
+        runtimeMaterial.SetColor("_EmissionColor", baseEmission);
+    }
 }
