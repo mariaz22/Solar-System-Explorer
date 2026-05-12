@@ -67,6 +67,7 @@ public class SceneBootstrap : MonoBehaviour
         if (GetComponent<RandomEventManager>() == null) gameObject.AddComponent<RandomEventManager>();
         if (GetComponent<MissionLog>() == null) gameObject.AddComponent<MissionLog>();
         if (GetComponent<SolarWind>() == null) gameObject.AddComponent<SolarWind>();
+        if (GetComponent<CosmicTimelineManager>() == null) gameObject.AddComponent<CosmicTimelineManager>();
     }
 
     void ConfigureLighting()
@@ -173,6 +174,7 @@ bloom.highQualityFiltering.Override(true);
             AddSunGlow(sun);
             var sunSpin = sun.GetComponent<SelfRotation>() ?? sun.AddComponent<SelfRotation>();
             sunSpin.degreesPerSecond = 8f;
+            if (sun.GetComponent<SunEvolutionController>() == null) sun.AddComponent<SunEvolutionController>();
         }
 
         var planets = Object.FindObjectsByType<Planet>(FindObjectsInactive.Exclude);
@@ -258,6 +260,9 @@ bloom.highQualityFiltering.Override(true);
 
             if (p.GetComponent<ScanEffect>() == null)
                 p.gameObject.AddComponent<ScanEffect>();
+
+            if (p.GetComponent<PlanetEvolutionController>() == null)
+                p.gameObject.AddComponent<PlanetEvolutionController>();
             }
 
         // ── Asteroid belt (between Mars and Jupiter) ──────────────────
@@ -480,7 +485,7 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         var glow = new GameObject("SunGlow");
         glow.transform.SetParent(sun.transform, false);
         glow.transform.localPosition = Vector3.zero;
-        glow.transform.localScale = Vector3.one * 1.75f;
+        glow.transform.localScale = Vector3.one * 1.1f;
 
         var mf = glow.AddComponent<MeshFilter>();
         mf.mesh = BuildQuadMesh();
@@ -514,7 +519,7 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         var corona = new GameObject("SunCorona");
         corona.transform.SetParent(sun.transform, false);
         corona.transform.localPosition = Vector3.zero;
-        corona.transform.localScale = Vector3.one * 3.2f;
+        corona.transform.localScale = Vector3.one * 1.5f;
         var mf2 = corona.AddComponent<MeshFilter>();
         mf2.mesh = BuildQuadMesh();
         var mr2 = corona.AddComponent<MeshRenderer>();
@@ -670,6 +675,9 @@ corona.AddComponent<Billboard>();
 
         // ── Time Scale UI ──
         CreateTimeScaleUI();
+
+        // ── Cosmic Timeline UI ──
+        CreateCosmicTimelineUI();
     }
 
     void StylePlanetPanel()
@@ -698,9 +706,9 @@ corona.AddComponent<Billboard>();
         cs.matchWidthOrHeight = 0.5f;
         var cRoot = cGO.GetComponent<RectTransform>();
 
-        // Outer panel — top-left, 300×360
+        // Outer panel — top-left, 300×412
         var panel = UIRect("PlanetPanel", cRoot);
-        SetCorner(panel, new Vector2(0,1), new Vector2(0,1), new Vector2(0,1), new Vector2(20,-20), new Vector2(300, 360));
+        SetCorner(panel, new Vector2(0,1), new Vector2(0,1), new Vector2(0,1), new Vector2(20,-20), new Vector2(300, 412));
         AddImage(panel, new Color(0.04f, 0.06f, 0.12f, 0.92f));
 
         // Cyan top accent
@@ -746,7 +754,7 @@ corona.AddComponent<Billboard>();
 
         // Divider 2
         var div2 = UIRect("Divider2", panel);
-        SetCorner(div2, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(0,76), new Vector2(0,1));
+        SetCorner(div2, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(0,128), new Vector2(0,1));
         AddImage(div2, new Color(0f, 0.85f, 1f, 0.3f));
 
         // Send probe button
@@ -754,9 +762,26 @@ corona.AddComponent<Billboard>();
         {
             ui.sendProbeButton.transform.SetParent(panel, false);
             var bRT = ui.sendProbeButton.GetComponent<RectTransform>();
-            SetCorner(bRT, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(12,12), new Vector2(-12,52));
+            SetCorner(bRT, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(12,64), new Vector2(-12,52));
             StyleButton(ui.sendProbeButton, "SEND PROBE", new Color(0f, 0.85f, 1f));
         }
+
+        // Divider between buttons
+        var div3 = UIRect("Divider3", panel);
+        SetCorner(div3, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(12,60), new Vector2(-12,1));
+        AddImage(div3, new Color(1f, 0.35f, 0.35f, 0.25f));
+
+        // Reset mission button
+        var resetRT = UIRect("ResetMissionBtn", panel);
+        SetCorner(resetRT, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(12,12), new Vector2(-12,44));
+        AddImage(resetRT, new Color(0.04f, 0.06f, 0.12f, 0.92f));
+        var resetLblRT = UIRect("Label", resetRT);
+        resetLblRT.anchorMin = Vector2.zero; resetLblRT.anchorMax = Vector2.one;
+        resetLblRT.offsetMin = resetLblRT.offsetMax = Vector2.zero;
+        Label(resetLblRT, "RESET MISSION", 13, new Color(1f, 0.35f, 0.35f), FontStyles.Bold, 2f);
+        var resetBtn = resetRT.gameObject.AddComponent<Button>();
+        StyleButton(resetBtn, "RESET MISSION", new Color(1f, 0.35f, 0.35f));
+        resetBtn.onClick.AddListener(() => HUDController.Instance?.ResetMission());
     }
 
     void CreateTimeScaleUI()
@@ -856,6 +881,140 @@ corona.AddComponent<Billboard>();
         var ctrl = canvasGO.AddComponent<TimeScaleController>();
         ctrl.timeSlider = slider; ctrl.pauseButton = btn;
         ctrl.speedLabel = speedTMP; ctrl.pauseButtonText = btnTMP;
+    }
+
+    void CreateCosmicTimelineUI()
+    {
+        var canvasGO = new GameObject("CosmicTimelineCanvas",
+            typeof(Canvas), typeof(CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
+        var canvas = canvasGO.GetComponent<Canvas>();
+        canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.sortingOrder = 25;
+        var scaler = canvasGO.GetComponent<CanvasScaler>();
+        scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+        scaler.referenceResolution = new Vector2(1920, 1080);
+        scaler.matchWidthOrHeight = 0.5f;
+        var root = canvasGO.GetComponent<RectTransform>();
+
+        // ── Panel: bottom-right, 400×140, above TimeScalePanel ──
+        var panel = UIRect("CosmicTimelinePanel", root);
+        SetCorner(panel, new Vector2(1,0), new Vector2(1,0), new Vector2(1,0), new Vector2(-20,208), new Vector2(400,140));
+        AddImage(panel, new Color(0.04f, 0.06f, 0.12f, 0.85f));
+
+        // Cyan top accent
+        var accent = UIRect("Accent", panel);
+        SetCorner(accent, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), Vector2.zero, new Vector2(0,2));
+        AddImage(accent, new Color(0f, 0.85f, 1f));
+
+        // Title (top-left)
+        var titleR = UIRect("Title", panel);
+        SetCorner(titleR, new Vector2(0,1), new Vector2(0,1), new Vector2(0,1), new Vector2(12,-7), new Vector2(210,20));
+        Label(titleR, "// COSMIC TIMELINE //", 11, new Color(0f,0.85f,1f), FontStyles.Bold, 2f);
+
+        // Time label (top-right) — e.g. "4.5 GYR  PRESENT DAY"
+        var timeR = UIRect("TimeLabel", panel);
+        SetCorner(timeR, new Vector2(1,1), new Vector2(1,1), new Vector2(1,1), new Vector2(-12,-7), new Vector2(165,20));
+        var timeTMP = Label(timeR, "4.5 GYR  PRESENT DAY", 11, Color.white, FontStyles.Bold);
+        timeTMP.alignment = TextAlignmentOptions.Right;
+
+        // Stage badge (full width, centered, below title row)
+        var stageR = UIRect("StageBadge", panel);
+        SetCorner(stageR, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), new Vector2(0,-30), new Vector2(-24,20));
+        var stageTMP = Label(stageR, "●  MAIN SEQUENCE", 12, new Color(0.30f,1f,0.40f), FontStyles.Bold, 1f);
+        stageTMP.alignment = TextAlignmentOptions.Center;
+
+        // Separator under stage badge
+        var sep = UIRect("Sep", panel);
+        SetCorner(sep, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), new Vector2(0,-53), new Vector2(-24,1));
+        AddImage(sep, new Color(0.2f, 0.5f, 1f, 0.3f));
+
+        // Slider
+        var sliderR = UIRect("CosmicSlider", panel);
+        SetCorner(sliderR, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), new Vector2(0,-58), new Vector2(-24,22));
+        var slider = sliderR.gameObject.AddComponent<Slider>();
+        slider.direction = Slider.Direction.LeftToRight;
+        slider.minValue = 0f; slider.maxValue = 13f;
+        slider.value = 4.5f; slider.wholeNumbers = false;
+
+        var bgR = UIRect("Background", sliderR);
+        bgR.anchorMin = new Vector2(0, 0.35f); bgR.anchorMax = new Vector2(1, 0.65f);
+        bgR.offsetMin = bgR.offsetMax = Vector2.zero;
+        AddImage(bgR, new Color(0.1f, 0.14f, 0.22f));
+
+        var faR = UIRect("Fill Area", sliderR);
+        faR.anchorMin = new Vector2(0, 0.35f); faR.anchorMax = new Vector2(1, 0.65f);
+        faR.offsetMin = faR.offsetMax = Vector2.zero;
+
+        var fillR = UIRect("Fill", faR);
+        fillR.anchorMin = Vector2.zero; fillR.anchorMax = new Vector2(0, 1);
+        fillR.offsetMin = fillR.offsetMax = Vector2.zero;
+        AddImage(fillR, new Color(0f, 0.75f, 1f, 0.5f));
+
+        var haR = UIRect("Handle Slide Area", sliderR);
+        haR.anchorMin = Vector2.zero; haR.anchorMax = Vector2.one;
+        haR.offsetMin = haR.offsetMax = Vector2.zero;
+
+        var handleR = UIRect("Handle", haR);
+        handleR.anchorMin = new Vector2(0, 0); handleR.anchorMax = new Vector2(0, 1);
+        handleR.pivot = new Vector2(0.5f, 0.5f);
+        handleR.offsetMin = new Vector2(-8, 0); handleR.offsetMax = new Vector2(8, 0);
+        var handleImg = AddImage(handleR, Color.white);
+
+        slider.fillRect = fillR; slider.handleRect = handleR; slider.targetGraphic = handleImg;
+
+        // Tick labels: 0 GYR left, 13 GYR right
+        var lbl0 = UIRect("Lbl0", sliderR);
+        SetCorner(lbl0, new Vector2(0,0), new Vector2(0,0), new Vector2(0,1), new Vector2(0,-2), new Vector2(40,14));
+        Label(lbl0, "0 GYR", 9, new Color(0.55f,0.65f,0.75f));
+
+        var lbl13 = UIRect("Lbl13", sliderR);
+        SetCorner(lbl13, new Vector2(1,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,-2), new Vector2(40,14));
+        Label(lbl13, "13 GYR", 9, new Color(0.55f,0.65f,0.75f)).alignment = TextAlignmentOptions.Right;
+
+        // Stage color bar below slider
+        var barR = UIRect("StageBar", panel);
+        SetCorner(barR, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), new Vector2(0,-88), new Vector2(-24,8));
+        AddImage(barR, new Color(0.1f, 0.14f, 0.22f));
+
+        // 5 colored segments proportional to Gyr ranges (total 13 Gyr)
+        (float start, float end, Color col)[] segs =
+        {
+            (0f,   5f,   new Color(0.30f, 1.00f, 0.40f, 0.85f)), // MainSequence  — green
+            (5f,   6f,   new Color(1.00f, 0.85f, 0.20f, 0.85f)), // SubGiant      — yellow
+            (6f,   8.5f, new Color(1.00f, 0.25f, 0.10f, 0.85f)), // RedGiant      — red
+            (8.5f, 9.5f, new Color(0.70f, 0.30f, 1.00f, 0.85f)), // PlanetaryNebula — purple
+            (9.5f, 13f,  new Color(0.40f, 0.85f, 1.00f, 0.85f)), // WhiteDwarf    — cyan
+        };
+        foreach (var (s, e, c) in segs)
+        {
+            var seg = UIRect($"Seg_{s}", barR);
+            seg.anchorMin = new Vector2(s / 13f, 0);
+            seg.anchorMax = new Vector2(e / 13f, 1);
+            seg.offsetMin = seg.offsetMax = Vector2.zero;
+            AddImage(seg, c);
+        }
+
+        // "NOW" button — snaps timeline to present day (4.5 Gyr)
+        var nowR = UIRect("NowButton", panel);
+        SetCorner(nowR, new Vector2(0.5f,0), new Vector2(0.5f,0), new Vector2(0.5f,0), new Vector2(0,10), new Vector2(160,22));
+        var nowImg = AddImage(nowR, new Color(0.06f, 0.12f, 0.08f, 0.90f));
+        var nowLblR = UIRect("Label", nowR);
+        nowLblR.anchorMin = Vector2.zero; nowLblR.anchorMax = Vector2.one;
+        nowLblR.offsetMin = nowLblR.offsetMax = Vector2.zero;
+        Label(nowLblR, "◄  PRESENT DAY  ►", 10, new Color(0.30f, 1f, 0.40f), FontStyles.Bold, 1f).alignment = TextAlignmentOptions.Center;
+        var nowBtn = nowR.gameObject.AddComponent<Button>();
+        var nowBc = nowBtn.colors;
+        nowBc.normalColor      = new Color(0.06f, 0.12f, 0.08f, 0.90f);
+        nowBc.highlightedColor = new Color(0.12f, 0.28f, 0.16f, 0.95f);
+        nowBc.pressedColor     = new Color(0.02f, 0.06f, 0.04f, 1.00f);
+        nowBtn.colors = nowBc; nowBtn.targetGraphic = nowImg;
+        nowBtn.onClick.AddListener(() => slider.value = 4.5f);
+
+        // Controller
+        var ctrl = canvasGO.AddComponent<CosmicTimelineUIController>();
+        ctrl.slider     = slider;
+        ctrl.timeLabel  = timeTMP;
+        ctrl.stageLabel = stageTMP;
     }
 
     static void ReparentAndAnchor(Transform t, Transform newParent, Vector2 pos, Vector2 size)

@@ -1,7 +1,6 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
-using UnityEngine.Events;
 
 public class HUDController : MonoBehaviour
 {
@@ -65,7 +64,6 @@ public class HUDController : MonoBehaviour
         BuildNotificationArea(root);
         BuildScreenFlash(root);
         BuildScanOverlay(root);
-        BuildResetButton(root);
         }
 
         void BuildScanOverlay(RectTransform root)
@@ -337,36 +335,7 @@ public class HUDController : MonoBehaviour
         flashTimer = 1f;
     }
 
-    void BuildResetButton(RectTransform root)
-    {
-        var btn = Panel("ResetBtn", root, new Color(0.45f, 0.06f, 0.06f, 0.88f));
-        btn.anchorMin = new Vector2(1, 0); btn.anchorMax = new Vector2(1, 0);
-        btn.pivot = new Vector2(1, 0);
-        btn.anchoredPosition = new Vector2(0, 72 + 26);
-        btn.sizeDelta = new Vector2(150, 26);
-
-        var topLine = Panel("Line", btn, new Color(1f, 0.3f, 0.3f, 0.4f));
-        topLine.anchorMin = new Vector2(0, 1); topLine.anchorMax = new Vector2(1, 1);
-        topLine.pivot = new Vector2(0.5f, 1); topLine.anchoredPosition = Vector2.zero; topLine.sizeDelta = new Vector2(0, 1);
-
-        var lbl = Lbl("Txt", btn, "[ RESET MISSION ]", 10, new Color(1f, 0.45f, 0.45f, 0.95f));
-        lbl.characterSpacing = 0.5f;
-
-        var img = btn.gameObject.GetComponent<Image>();
-        if (img == null) img = btn.gameObject.AddComponent<Image>();
-        img.color = new Color(0.45f, 0.06f, 0.06f, 0.88f);
-
-        var button = btn.gameObject.AddComponent<Button>();
-        var colors = button.colors;
-        colors.normalColor = Color.white;
-        colors.highlightedColor = new Color(1f, 0.6f, 0.6f);
-        colors.pressedColor = new Color(0.8f, 0.2f, 0.2f);
-        button.colors = colors;
-        button.targetGraphic = img;
-        button.onClick.AddListener(ResetMission);
-    }
-
-    void ResetMission()
+    public void ResetMission()
     {
         if (PlanetManager.Instance != null)
             foreach (var p in PlanetManager.Instance.planets)
