@@ -23,11 +23,13 @@ public static class PlanetMaterialCreator
     {
         EnsureFolders();
 
-        var litShader = Shader.Find("Universal Render Pipeline/Lit");
+        // Prefer the custom animated surface shader; fall back to URP/Lit for the sun (emissive).
+        var surfShader = Shader.Find("Solar/PlanetSurface");
+        var litShader  = Shader.Find("Universal Render Pipeline/Lit");
         if (litShader == null) { Debug.LogError("[PlanetMaterialCreator] URP Lit shader not found."); return; }
 
         foreach (var (name, smoothness, emissive) in PlanetDefs)
-            CreateOrUpdate(name, smoothness, emissive, litShader);
+            CreateOrUpdate(name, smoothness, emissive, emissive ? litShader : (surfShader ?? litShader));
 
         AssetDatabase.SaveAssets();
         AssetDatabase.Refresh();

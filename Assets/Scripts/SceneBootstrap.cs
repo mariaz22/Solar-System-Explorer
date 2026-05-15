@@ -95,7 +95,7 @@ public class SceneBootstrap : MonoBehaviour
             if (sunLight == null) sunLight = sun.AddComponent<Light>();
             sunLight.type = LightType.Point;
             sunLight.color = new Color(1f, 0.98f, 0.96f);
-            sunLight.intensity = 200_000f;
+            sunLight.intensity = 55_000f;
             sunLight.range = 4000f;
             sunLight.shadows = LightShadows.None;
         }
@@ -186,6 +186,7 @@ public class SceneBootstrap : MonoBehaviour
             var sunSpin = sun.GetComponent<SelfRotation>() ?? sun.AddComponent<SelfRotation>();
             sunSpin.degreesPerSecond = 8f;
             if (sun.GetComponent<SunEvolutionController>() == null) sun.AddComponent<SunEvolutionController>();
+            if (sun.GetComponent<SunDistortionSetup>() == null)    sun.AddComponent<SunDistortionSetup>();
         }
 
         var planets = Object.FindObjectsByType<Planet>(FindObjectsInactive.Exclude);
@@ -258,6 +259,7 @@ public class SceneBootstrap : MonoBehaviour
                     SetSmoothness(p.gameObject, sm);
             }
             AddAtmosphere(p.gameObject, def.color);
+            AddCloudLayer(p, p.data.planetName);
 
             var orbit = p.gameObject.GetComponent<OrbitalMotion>() ?? p.gameObject.AddComponent<OrbitalMotion>();
             orbit.center = sunT;
@@ -349,8 +351,6 @@ public class SceneBootstrap : MonoBehaviour
         }
     }
 
-    // Loads a pre-created material asset and instantiates it so runtime modifications
-    // (e.g. SunEvolutionController) affect only the instance, not the saved asset.
     static void ApplyPrebuiltMaterial(GameObject go, Material sourceMat, bool shadowCasting)
     {
         var r = go.GetComponentInChildren<Renderer>();
@@ -362,17 +362,114 @@ public class SceneBootstrap : MonoBehaviour
         r.material = new Material(sourceMat);
     }
 
+    static void SetCloudParams(Material mat, string planetName)
+    {
+        switch (planetName)
+        {
+            case "Venus":
+                mat.SetColor("_CloudColor", new Color(0.95f, 0.90f, 0.70f));
+                mat.SetFloat("_Coverage",   0.68f);
+                mat.SetFloat("_Opacity",    0.40f);
+                mat.SetFloat("_ScrollX",   -0.004f);
+                mat.SetFloat("_ScrollY",    0.001f);
+                mat.SetFloat("_Scale",      3.0f);
+                break;
+            case "Earth":
+                mat.SetColor("_CloudColor", new Color(0.96f, 0.97f, 1.00f));
+                mat.SetFloat("_Coverage",   0.38f);
+                mat.SetFloat("_Opacity",    0.32f);
+                mat.SetFloat("_ScrollX",    0.006f);
+                mat.SetFloat("_ScrollY",    0.002f);
+                mat.SetFloat("_Scale",      4.0f);
+                break;
+            case "Mars":
+                mat.SetColor("_CloudColor", new Color(0.90f, 0.82f, 0.68f));
+                mat.SetFloat("_Coverage",   0.15f);
+                mat.SetFloat("_Opacity",    0.14f);
+                mat.SetFloat("_ScrollX",    0.003f);
+                mat.SetFloat("_ScrollY",    0.001f);
+                mat.SetFloat("_Scale",      5.0f);
+                break;
+            case "Jupiter":
+                mat.SetColor("_CloudColor", new Color(0.93f, 0.87f, 0.74f));
+                mat.SetFloat("_Coverage",   0.52f);
+                mat.SetFloat("_Opacity",    0.26f);
+                mat.SetFloat("_ScrollX",    0.014f);
+                mat.SetFloat("_ScrollY",    0.000f);
+                mat.SetFloat("_Scale",      2.2f);
+                break;
+            case "Saturn":
+                mat.SetColor("_CloudColor", new Color(0.95f, 0.90f, 0.72f));
+                mat.SetFloat("_Coverage",   0.45f);
+                mat.SetFloat("_Opacity",    0.22f);
+                mat.SetFloat("_ScrollX",    0.011f);
+                mat.SetFloat("_ScrollY",    0.000f);
+                mat.SetFloat("_Scale",      2.5f);
+                break;
+            case "Uranus":
+                mat.SetColor("_CloudColor", new Color(0.72f, 0.91f, 0.96f));
+                mat.SetFloat("_Coverage",   0.25f);
+                mat.SetFloat("_Opacity",    0.16f);
+                mat.SetFloat("_ScrollX",    0.005f);
+                mat.SetFloat("_ScrollY",    0.002f);
+                mat.SetFloat("_Scale",      3.5f);
+                break;
+            case "Neptune":
+                mat.SetColor("_CloudColor", new Color(0.50f, 0.68f, 1.00f));
+                mat.SetFloat("_Coverage",   0.38f);
+                mat.SetFloat("_Opacity",    0.22f);
+                mat.SetFloat("_ScrollX",    0.009f);
+                mat.SetFloat("_ScrollY",    0.002f);
+                mat.SetFloat("_Scale",      3.0f);
+                break;
+            default:
+                mat.SetFloat("_Coverage",   0.28f);
+                mat.SetFloat("_Opacity",    0.20f);
+                mat.SetFloat("_ScrollX",    0.005f);
+                mat.SetFloat("_ScrollY",    0.002f);
+                mat.SetFloat("_Scale",      4.0f);
+                break;
+        }
+    }
+
+    static void AddCloudLayer(Planet p, string planetName)
+    {
+        if (planetName == "Mercury") return;
+
+        var cloudShader = Shader.Find("Solar/CloudLayer");
+        if (cloudShader == null)
+        {
+            Debug.LogWarning("[SceneBootstrap] Solar/CloudLayer shader not found — clouds skipped.");
+            return;
+        }
+
+        var old = p.transform.Find("CloudLayer");
+        if (old != null) Object.Destroy(old.gameObject);
+
+        var cloudGO = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+        cloudGO.name = "CloudLayer";
+        cloudGO.transform.SetParent(p.transform, false);
+        cloudGO.transform.localScale = Vector3.one * 1.010f;
+        Object.Destroy(cloudGO.GetComponent<SphereCollider>());
+
+        var mat = new Material(cloudShader);
+        SetCloudParams(mat, planetName);
+
+        var mr = cloudGO.GetComponent<MeshRenderer>();
+        mr.material          = mat;
+        mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+        mr.receiveShadows    = false;
+    }
+
     void ApplyRealTexture(GameObject go, Texture2D tex, bool emissive = false)
     {
         var r = go.GetComponentInChildren<Renderer>();
         if (r == null) return;
         r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
         r.receiveShadows = true;
-        
-        var litShader = Shader.Find("Universal Render Pipeline/Lit");
-        var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
-        r.material = m;
 
+        var litShader = Shader.Find("Universal Render Pipeline/Lit");
+        Material m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         if (m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", tex);
         if (m.HasProperty("_MainTex")) m.SetTexture("_MainTex", tex);
         m.mainTexture = tex;
@@ -380,16 +477,17 @@ public class SceneBootstrap : MonoBehaviour
         if (emissive)
         {
             m.EnableKeyword("_EMISSION");
-            if (m.HasProperty("_EmissionMap")) m.SetTexture("_EmissionMap", tex);
+            if (m.HasProperty("_EmissionMap"))   m.SetTexture("_EmissionMap", tex);
             if (m.HasProperty("_EmissionColor")) m.SetColor("_EmissionColor", new Color(1f, 0.75f, 0.3f) * 4.5f);
-            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", Color.white);
+            if (m.HasProperty("_BaseColor"))     m.SetColor("_BaseColor", Color.white);
         }
         else
         {
-            if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", Color.white);
-            if (m.HasProperty("_Metallic")) m.SetFloat("_Metallic", 0f);
+            if (m.HasProperty("_BaseColor"))  m.SetColor("_BaseColor", Color.white);
+            if (m.HasProperty("_Metallic"))   m.SetFloat("_Metallic", 0f);
             if (m.HasProperty("_Smoothness")) m.SetFloat("_Smoothness", 0.1f);
         }
+        r.material = m;
     }
 
     static void SetSmoothness(GameObject go, float smoothness)
@@ -700,7 +798,7 @@ public class SceneBootstrap : MonoBehaviour
     void StylePlanetPanel()
     {
         // Include inactive — Canvas may be hidden in Edit Mode by EditModePreview
-        var uis = Object.FindObjectsByType<PlanetSelectionUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        var uis = Object.FindObjectsByType<PlanetSelectionUI>(FindObjectsInactive.Include);
         if (uis.Length == 0) return;
         var ui = uis[0];
         var existingCanvas = ui.GetComponentInParent<Canvas>(true);
@@ -1145,8 +1243,7 @@ public class SceneBootstrap : MonoBehaviour
             }
         }
 
-        var uis = Object.FindObjectsByType<PlanetSelectionUI>(
-            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        var uis = Object.FindObjectsByType<PlanetSelectionUI>(FindObjectsInactive.Include);
         if (uis.Length > 0)
         {
             var rawCanvas = uis[0].GetComponentInParent<Canvas>(true);
