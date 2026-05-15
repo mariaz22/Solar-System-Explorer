@@ -11,6 +11,7 @@ public class MoonTag : MonoBehaviour
     void OnDisable() => All.Remove(this);
 }
 
+[ExecuteAlways]
 [DefaultExecutionOrder(-100)]
 public class SceneBootstrap : MonoBehaviour
 {
@@ -49,10 +50,13 @@ public class SceneBootstrap : MonoBehaviour
 
     void Awake()
     {
-        // Force override any stale Inspector-serialized values
+        var splash = GameObject.Find("__EditSplash__");
+        if (splash != null) Destroy(splash);
+
+        if (!Application.isPlaying) return;
+
         sunScale = 140f;
 
-        // Reposition & scale nebulae around the solar system before their Awake() runs
         var nebulaPositions = new Vector3[]
         {
             new Vector3( 550f,  80f, -300f),   // between Jupiter & Saturn, right side
@@ -94,24 +98,23 @@ public class SceneBootstrap : MonoBehaviour
             sunLight.intensity = 200_000f;
             sunLight.range = 4000f;
             sunLight.shadows = LightShadows.None;
-            }
+        }
 
-            foreach (var c in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
-            {
+        foreach (var c in Object.FindObjectsByType<Camera>(FindObjectsInactive.Include))
+        {
             c.allowHDR = true;
             var urp = c.GetUniversalAdditionalCameraData();
             if (urp != null)
             {
                 urp.renderPostProcessing = true;
                 urp.antialiasing = AntialiasingMode.FastApproximateAntialiasing;
-                }
-                }
+            }
+        }
 
         RenderSettings.ambientMode = UnityEngine.Rendering.AmbientMode.Flat;
         RenderSettings.ambientLight = new Color(0.13f, 0.13f, 0.16f);
 
-        // Very dim fill lights — just enough to prevent pitch-black shadows.
-        // Kept low so the sun Point Light (200k+ intensity) is the dominant directional source.
+        // Dim fill lights prevent fully-black shadow sides without competing with the sun's point light.
         var fillGO = new GameObject("FillLight");
         fillGO.transform.SetParent(transform, false);
         var fill = fillGO.AddComponent<Light>();
@@ -141,7 +144,7 @@ public class SceneBootstrap : MonoBehaviour
         colorAdj.active = true;
         colorAdj.postExposure.Override(0.25f);
         colorAdj.contrast.Override(18f);
-        colorAdj.saturation.Override(45f); // Increased saturation for vibrant nebulae
+        colorAdj.saturation.Override(45f);
         colorAdj.colorFilter.Override(Color.white);
 
         var vignette = bloomProfile.Add<UnityEngine.Rendering.Universal.Vignette>(true);
@@ -151,11 +154,11 @@ public class SceneBootstrap : MonoBehaviour
 
         var bloom = bloomProfile.Add<UnityEngine.Rendering.Universal.Bloom>(true);
         bloom.active = true;
-        bloom.threshold.Override(1.02f); // Lower threshold so stars and textures can glow slightly
-        bloom.intensity.Override(0.7f);  // Slightly higher intensity
+        bloom.threshold.Override(1.02f);
+        bloom.intensity.Override(0.7f);
         bloom.scatter.Override(0.7f);
         bloom.tint.Override(new Color(1f, 0.95f, 0.85f));
-bloom.highQualityFiltering.Override(true);
+        bloom.highQualityFiltering.Override(true);
 
         var volGO = new GameObject("RuntimeBloomVolume");
         volGO.transform.SetParent(transform, false);
@@ -173,6 +176,7 @@ bloom.highQualityFiltering.Override(true);
         {
             sun.transform.position = Vector3.zero;
             sun.transform.localScale = Vector3.one * sunScale;
+            // SunEvolutionController modifies emission and color at runtime per cosmic stage.
             var sunRealTex = Resources.Load<Texture2D>("PlanetTextures/Sun");
             if (sunRealTex != null)
                 ApplyRealTexture(sun, sunRealTex, emissive: true);
@@ -235,16 +239,24 @@ bloom.highQualityFiltering.Override(true);
             };
             p.transform.localScale = Vector3.one * s;
 
-            var realTex = Resources.Load<Texture2D>($"PlanetTextures/{p.data.planetName}");
-            if (realTex != null)
-                ApplyRealTexture(p.gameObject, realTex);
+            var prebuiltMat = Resources.Load<Material>($"Materials/Planets/Planet_{p.data.planetName}");
+            if (prebuiltMat != null)
+            {
+                ApplyPrebuiltMaterial(p.gameObject, prebuiltMat, shadowCasting: true);
+            }
             else
             {
-                var maps = ProceduralPlanetTexture.Generate(p.data.planetName, def.color);
-                ApplyTexture(p.gameObject, maps, emissive: false);
+                var realTex = Resources.Load<Texture2D>($"PlanetTextures/{p.data.planetName}");
+                if (realTex != null)
+                    ApplyRealTexture(p.gameObject, realTex);
+                else
+                {
+                    var maps = ProceduralPlanetTexture.Generate(p.data.planetName, def.color);
+                    ApplyTexture(p.gameObject, maps, emissive: false);
+                }
+                if (smoothnessMap.TryGetValue(p.data.planetName, out float sm))
+                    SetSmoothness(p.gameObject, sm);
             }
-            if (smoothnessMap.TryGetValue(p.data.planetName, out float sm))
-                SetSmoothness(p.gameObject, sm);
             AddAtmosphere(p.gameObject, def.color);
 
             var orbit = p.gameObject.GetComponent<OrbitalMotion>() ?? p.gameObject.AddComponent<OrbitalMotion>();
@@ -270,9 +282,9 @@ bloom.highQualityFiltering.Override(true);
 
             if (p.GetComponent<PlanetEvolutionController>() == null)
                 p.gameObject.AddComponent<PlanetEvolutionController>();
-            }
+        }
 
-        // ── Asteroid belt (between Mars and Jupiter) ──────────────────
+        // Asteroid belt
         if (sunT != null)
         {
             float marsOrbit    = 340f;
@@ -292,7 +304,6 @@ bloom.highQualityFiltering.Override(true);
             belt.maxSize   = 1.4f;
         }
 
-        // ── Moons for gas giants ──────────────────────────────────────
         foreach (var p in planets)
         {
             if (p == null) continue;
@@ -305,7 +316,6 @@ bloom.highQualityFiltering.Override(true);
             Vector3 safe = new Vector3(0f, 0f, -(925f + probeStartOffset));
             probe.transform.position = safe;
             probe.transform.localScale = Vector3.one * 1.2f;
-            // Force override serialized Inspector values to match current system scale
             probe.speed             = 85f;
             probe.arrivalThreshold  = 18f;
             probe.avoidanceStrength = 220f;
@@ -336,18 +346,31 @@ bloom.highQualityFiltering.Override(true);
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = Color.black;
             if (cam.GetComponent<FreeFlyCamera>() == null) cam.gameObject.AddComponent<FreeFlyCamera>();
-            }
-            }
+        }
+    }
+
+    // Loads a pre-created material asset and instantiates it so runtime modifications
+    // (e.g. SunEvolutionController) affect only the instance, not the saved asset.
+    static void ApplyPrebuiltMaterial(GameObject go, Material sourceMat, bool shadowCasting)
+    {
+        var r = go.GetComponentInChildren<Renderer>();
+        if (r == null) return;
+        r.shadowCastingMode = shadowCasting
+            ? UnityEngine.Rendering.ShadowCastingMode.On
+            : UnityEngine.Rendering.ShadowCastingMode.Off;
+        r.receiveShadows = shadowCasting;
+        r.material = new Material(sourceMat);
+    }
 
     void ApplyRealTexture(GameObject go, Texture2D tex, bool emissive = false)
     {
         var r = go.GetComponentInChildren<Renderer>();
         if (r == null) return;
-        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On; // Enable shadow casting
+        r.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.On;
         r.receiveShadows = true;
         
         var litShader = Shader.Find("Universal Render Pipeline/Lit");
-var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
+        var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         r.material = m;
 
         if (m.HasProperty("_BaseMap")) m.SetTexture("_BaseMap", tex);
@@ -358,7 +381,6 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         {
             m.EnableKeyword("_EMISSION");
             if (m.HasProperty("_EmissionMap")) m.SetTexture("_EmissionMap", tex);
-            // High intensity for that "Sun" look, but tinted so texture is visible
             if (m.HasProperty("_EmissionColor")) m.SetColor("_EmissionColor", new Color(1f, 0.75f, 0.3f) * 4.5f);
             if (m.HasProperty("_BaseColor")) m.SetColor("_BaseColor", Color.white);
         }
@@ -447,10 +469,8 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
             float startAngle  = Random.Range(0f, 360f);
             float inclination = Random.Range(-15f, 15f);
 
-            // Place moon at its starting orbit position
             float rad = startAngle * Mathf.Deg2Rad;
             Vector3 localOffset = new Vector3(Mathf.Cos(rad) * orbitRadius, 0f, Mathf.Sin(rad) * orbitRadius);
-            // Apply inclination tilt
             localOffset = Quaternion.Euler(inclination, 0f, 0f) * localOffset;
             Vector3 worldPos = planet.transform.position + localOffset;
 
@@ -460,7 +480,6 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
             go.transform.position = worldPos;
             go.transform.localScale = Vector3.one * moonSize;
             
-            // We keep the collider but set it to a trigger if we want to avoid physics nudges
             var sc = go.GetComponent<SphereCollider>();
             if (sc != null) sc.isTrigger = true;
 
@@ -479,11 +498,9 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             mr.receiveShadows    = false;
 
-            // Self-rotation
             var spin = go.AddComponent<SelfRotation>();
             spin.degreesPerSecond = Random.Range(5f, 20f);
 
-            // Orbit around parent planet — faster for inner moons (Kepler)
             var orbit = go.AddComponent<OrbitalMotion>();
             orbit.center         = planet.transform;
             orbit.angularSpeedDeg = 25f / Mathf.Pow(orbitRadius, 0.75f);
@@ -553,7 +570,7 @@ var m = new Material(litShader != null ? litShader : r.sharedMaterial.shader);
         if (mat2.HasProperty("_BaseColor")) mat2.SetColor("_BaseColor", new Color(1f, 0.72f, 0.25f, 0.45f));
         if (mat2.HasProperty("_Color")) mat2.color = new Color(1f, 0.72f, 0.25f, 0.45f);
         mr2.material = mat2;
-corona.AddComponent<Billboard>();
+        corona.AddComponent<Billboard>();
     }
 
     void AddAtmosphere(GameObject planet, Color baseColor)
@@ -638,11 +655,9 @@ corona.AddComponent<Billboard>();
 
     void ConfigureUI()
     {
-        // ── Destroy any existing TimeScaleController GameObjects from scene ──
         foreach (var old in Object.FindObjectsByType<TimeScaleController>(FindObjectsInactive.Include))
             Destroy(old.gameObject);
 
-        // ── Clean every scene Canvas: destroy children that have no PlanetSelectionUI ──
         foreach (var cv in Object.FindObjectsByType<Canvas>(FindObjectsInactive.Include))
         {
             var rt = cv.GetComponent<RectTransform>();
@@ -655,7 +670,6 @@ corona.AddComponent<Billboard>();
             }
         }
 
-        // ── EventSystem (if not already present) ──
         if (Object.FindAnyObjectByType<UnityEngine.EventSystems.EventSystem>() == null)
         {
             var esGO = new GameObject("EventSystem");
@@ -663,7 +677,6 @@ corona.AddComponent<Billboard>();
             esGO.AddComponent<UnityEngine.InputSystem.UI.InputSystemUIInputModule>();
         }
 
-        // ── HUD ──
         var probe = Object.FindAnyObjectByType<ProbeController>();
         if (probe != null)
         {
@@ -672,33 +685,28 @@ corona.AddComponent<Billboard>();
             hudController.Setup(probe);
         }
 
-        // ── Target indicator ──
         var indicatorGO = new GameObject("TargetIndicator");
         indicatorGO.AddComponent<TargetIndicator>();
 
-        // ── Start screen ──
         var ssGO = new GameObject("StartScreen", typeof(Canvas), typeof(CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
         var ss = ssGO.AddComponent<StartScreen>();
         ss.Setup();
 
-        // ── Planet panel ──
         StylePlanetPanel();
-
-        // ── Time Scale UI ──
         CreateTimeScaleUI();
-
-        // ── Cosmic Timeline UI ──
         CreateCosmicTimelineUI();
     }
 
     void StylePlanetPanel()
     {
-        var ui = Object.FindAnyObjectByType<PlanetSelectionUI>();
-        if (ui == null) return;
-        var existingCanvas = ui.GetComponentInParent<Canvas>();
+        // Include inactive — Canvas may be hidden in Edit Mode by EditModePreview
+        var uis = Object.FindObjectsByType<PlanetSelectionUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        if (uis.Length == 0) return;
+        var ui = uis[0];
+        var existingCanvas = ui.GetComponentInParent<Canvas>(true);
         if (existingCanvas == null) return;
+        existingCanvas.gameObject.SetActive(true);
 
-        // Hide original raw panel children
         var existingRT = existingCanvas.GetComponent<RectTransform>();
         for (int i = existingRT.childCount - 1; i >= 0; i--)
         {
@@ -706,7 +714,6 @@ corona.AddComponent<Billboard>();
             if (ch.name == "Panel") ch.gameObject.SetActive(false);
         }
 
-        // Build our own canvas for the planet panel
         var cGO = new GameObject("PlanetCanvas", typeof(Canvas), typeof(CanvasScaler), typeof(UnityEngine.UI.GraphicRaycaster));
         var c = cGO.GetComponent<Canvas>();
         c.renderMode = RenderMode.ScreenSpaceOverlay;
@@ -717,17 +724,14 @@ corona.AddComponent<Billboard>();
         cs.matchWidthOrHeight = 0.5f;
         var cRoot = cGO.GetComponent<RectTransform>();
 
-        // Outer panel — top-left, 300×412
         var panel = UIRect("PlanetPanel", cRoot);
         SetCorner(panel, new Vector2(0,1), new Vector2(0,1), new Vector2(0,1), new Vector2(20,-20), new Vector2(300, 412));
         AddImage(panel, new Color(0.04f, 0.06f, 0.12f, 0.92f));
 
-        // Cyan top accent
         var accent = UIRect("Accent", panel);
         SetCorner(accent, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), Vector2.zero, new Vector2(0,3));
         AddImage(accent, new Color(0f, 0.85f, 1f, 0.9f));
 
-        // Title
         var titleR = UIRect("PanelTitle", panel);
         SetCorner(titleR, new Vector2(0,1), new Vector2(1,1), new Vector2(0,1), new Vector2(12,-8), new Vector2(-12,22));
         var titleT = titleR.gameObject.AddComponent<TextMeshProUGUI>();
@@ -736,7 +740,6 @@ corona.AddComponent<Billboard>();
         titleT.color = new Color(0f, 0.85f, 1f);
         titleT.characterSpacing = 3f;
 
-        // Dropdown re-parented
         if (ui.dropdown != null)
         {
             ui.dropdown.transform.SetParent(panel, false);
@@ -745,12 +748,10 @@ corona.AddComponent<Billboard>();
             StyleDropdown(ui.dropdown);
         }
 
-        // Divider
         var div = UIRect("Divider", panel);
         SetCorner(div, new Vector2(0,1), new Vector2(1,1), new Vector2(0,1), new Vector2(0,-80), new Vector2(0,1));
         AddImage(div, new Color(0f, 0.85f, 1f, 0.3f));
 
-        // Info text
         if (ui.infoText != null)
         {
             ui.infoText.transform.SetParent(panel, false);
@@ -763,12 +764,10 @@ corona.AddComponent<Billboard>();
             ui.infoText.margin = new Vector4(14, 10, 14, 0);
         }
 
-        // Divider 2
         var div2 = UIRect("Divider2", panel);
         SetCorner(div2, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(0,128), new Vector2(0,1));
         AddImage(div2, new Color(0f, 0.85f, 1f, 0.3f));
 
-        // Send probe button
         if (ui.sendProbeButton != null)
         {
             ui.sendProbeButton.transform.SetParent(panel, false);
@@ -777,12 +776,10 @@ corona.AddComponent<Billboard>();
             StyleButton(ui.sendProbeButton, "SEND PROBE", new Color(0f, 0.85f, 1f));
         }
 
-        // Divider between buttons
         var div3 = UIRect("Divider3", panel);
         SetCorner(div3, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(12,60), new Vector2(-12,1));
         AddImage(div3, new Color(1f, 0.35f, 0.35f, 0.25f));
 
-        // Reset mission button
         var resetRT = UIRect("ResetMissionBtn", panel);
         SetCorner(resetRT, new Vector2(0,0), new Vector2(1,0), new Vector2(0,0), new Vector2(12,12), new Vector2(-12,44));
         AddImage(resetRT, new Color(0.04f, 0.06f, 0.12f, 0.92f));
@@ -808,28 +805,23 @@ corona.AddComponent<Billboard>();
         scaler.matchWidthOrHeight = 0.5f;
         var root = canvasGO.GetComponent<RectTransform>();
 
-        // ── Panel: bottom-right, 400×120 ──
         var panel = UIRect("TimeScalePanel", root);
         SetCorner(panel, new Vector2(1,0), new Vector2(1,0), new Vector2(1,0), new Vector2(-20,80), new Vector2(400,120));
         AddImage(panel, new Color(0.04f, 0.06f, 0.12f, 0.92f));
 
-        // Top accent
         var accent2 = UIRect("Accent", panel);
         SetCorner(accent2, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), Vector2.zero, new Vector2(0,2));
         AddImage(accent2, new Color(0f, 0.85f, 1f));
 
-        // Title (top-left)
         var titleR2 = UIRect("Title", panel);
         SetCorner(titleR2, new Vector2(0,1), new Vector2(0,1), new Vector2(0,1), new Vector2(12,-7), new Vector2(160,20));
         Label(titleR2, "TIME CONTROL", 12, new Color(0f,0.85f,1f), FontStyles.Bold, 3f);
 
-        // Speed label (top-right)
         var speedR2 = UIRect("SpeedLabel", panel);
         SetCorner(speedR2, new Vector2(1,1), new Vector2(1,1), new Vector2(1,1), new Vector2(-12,-7), new Vector2(100,20));
         var speedTMP = Label(speedR2, "1x", 15, Color.white, FontStyles.Bold);
         speedTMP.alignment = TextAlignmentOptions.Right;
 
-        // Slider — middle strip, proper RectTransform from creation
         var sliderR2 = UIRect("TimeSlider", panel);
         SetCorner(sliderR2, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), new Vector2(0,-33), new Vector2(-24, 22));
         var slider = sliderR2.gameObject.AddComponent<Slider>();
@@ -863,7 +855,6 @@ corona.AddComponent<Billboard>();
 
         slider.fillRect = fillR2; slider.handleRect = handleR2; slider.targetGraphic = handleImg2;
 
-        // Tick labels
         var lbl1 = UIRect("Lbl1x", sliderR2);
         SetCorner(lbl1, new Vector2(0,0), new Vector2(0,0), new Vector2(0,1), new Vector2(0,-2), new Vector2(30,14));
         Label(lbl1, "1x", 10, new Color(0.55f,0.65f,0.75f));
@@ -872,7 +863,6 @@ corona.AddComponent<Billboard>();
         SetCorner(lbl100, new Vector2(1,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,-2), new Vector2(40,14));
         Label(lbl100, "100x", 10, new Color(0.55f,0.65f,0.75f)).alignment = TextAlignmentOptions.Right;
 
-        // Pause button (bottom-right of panel)
         var btnR2 = UIRect("PauseButton", panel);
         SetCorner(btnR2, new Vector2(1,0), new Vector2(1,0), new Vector2(1,0), new Vector2(-12,10), new Vector2(120,40));
         var btnImg2 = AddImage(btnR2, new Color(0.05f,0.15f,0.28f));
@@ -907,39 +897,32 @@ corona.AddComponent<Billboard>();
         scaler.matchWidthOrHeight = 0.5f;
         var root = canvasGO.GetComponent<RectTransform>();
 
-        // ── Panel: bottom-right, 400×140, above TimeScalePanel ──
         var panel = UIRect("CosmicTimelinePanel", root);
         SetCorner(panel, new Vector2(1,0), new Vector2(1,0), new Vector2(1,0), new Vector2(-20,208), new Vector2(400,140));
         AddImage(panel, new Color(0.04f, 0.06f, 0.12f, 0.85f));
 
-        // Cyan top accent
         var accent = UIRect("Accent", panel);
         SetCorner(accent, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), Vector2.zero, new Vector2(0,2));
         AddImage(accent, new Color(0f, 0.85f, 1f));
 
-        // Title (top-left)
         var titleR = UIRect("Title", panel);
         SetCorner(titleR, new Vector2(0,1), new Vector2(0,1), new Vector2(0,1), new Vector2(12,-7), new Vector2(210,20));
         Label(titleR, "// COSMIC TIMELINE //", 11, new Color(0f,0.85f,1f), FontStyles.Bold, 2f);
 
-        // Time label (top-right) — e.g. "4.5 GYR  PRESENT DAY"
         var timeR = UIRect("TimeLabel", panel);
         SetCorner(timeR, new Vector2(1,1), new Vector2(1,1), new Vector2(1,1), new Vector2(-12,-7), new Vector2(165,20));
         var timeTMP = Label(timeR, "4.5 GYR  PRESENT DAY", 11, Color.white, FontStyles.Bold);
         timeTMP.alignment = TextAlignmentOptions.Right;
 
-        // Stage badge (full width, centered, below title row)
         var stageR = UIRect("StageBadge", panel);
         SetCorner(stageR, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), new Vector2(0,-30), new Vector2(-24,20));
         var stageTMP = Label(stageR, "●  MAIN SEQUENCE", 12, new Color(0.30f,1f,0.40f), FontStyles.Bold, 1f);
         stageTMP.alignment = TextAlignmentOptions.Center;
 
-        // Separator under stage badge
         var sep = UIRect("Sep", panel);
         SetCorner(sep, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), new Vector2(0,-53), new Vector2(-24,1));
         AddImage(sep, new Color(0.2f, 0.5f, 1f, 0.3f));
 
-        // Slider
         var sliderR = UIRect("CosmicSlider", panel);
         SetCorner(sliderR, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), new Vector2(0,-58), new Vector2(-24,22));
         var slider = sliderR.gameObject.AddComponent<Slider>();
@@ -973,7 +956,6 @@ corona.AddComponent<Billboard>();
 
         slider.fillRect = fillR; slider.handleRect = handleR; slider.targetGraphic = handleImg;
 
-        // Tick labels: 0 GYR left, 13 GYR right
         var lbl0 = UIRect("Lbl0", sliderR);
         SetCorner(lbl0, new Vector2(0,0), new Vector2(0,0), new Vector2(0,1), new Vector2(0,-2), new Vector2(40,14));
         Label(lbl0, "0 GYR", 9, new Color(0.55f,0.65f,0.75f));
@@ -982,12 +964,10 @@ corona.AddComponent<Billboard>();
         SetCorner(lbl13, new Vector2(1,0), new Vector2(1,0), new Vector2(1,1), new Vector2(0,-2), new Vector2(40,14));
         Label(lbl13, "13 GYR", 9, new Color(0.55f,0.65f,0.75f)).alignment = TextAlignmentOptions.Right;
 
-        // Stage color bar below slider
         var barR = UIRect("StageBar", panel);
         SetCorner(barR, new Vector2(0,1), new Vector2(1,1), new Vector2(0.5f,1), new Vector2(0,-88), new Vector2(-24,8));
         AddImage(barR, new Color(0.1f, 0.14f, 0.22f));
 
-        // 5 colored segments proportional to Gyr ranges (total 13 Gyr)
         (float start, float end, Color col)[] segs =
         {
             (0f,   5f,   new Color(0.30f, 1.00f, 0.40f, 0.85f)), // MainSequence  — green
@@ -1021,7 +1001,6 @@ corona.AddComponent<Billboard>();
         nowBtn.colors = nowBc; nowBtn.targetGraphic = nowImg;
         nowBtn.onClick.AddListener(() => slider.value = 4.5f);
 
-        // Controller
         var ctrl = canvasGO.AddComponent<CosmicTimelineUIController>();
         ctrl.slider     = slider;
         ctrl.timeLabel  = timeTMP;
@@ -1046,8 +1025,6 @@ corona.AddComponent<Billboard>();
         rt.localScale = Vector3.one;
         rt.localRotation = Quaternion.identity;
     }
-
-    // ── UI build helpers ─────────────────────────────────────────
 
     static RectTransform UIRect(string name, Transform parent)
     {
@@ -1099,4 +1076,83 @@ corona.AddComponent<Billboard>();
         var lbl = btn.GetComponentInChildren<TextMeshProUGUI>();
         if (lbl) { lbl.text = text; lbl.color = accentColor; lbl.fontStyle = FontStyles.Bold; lbl.fontSize = 16; lbl.alignment = TextAlignmentOptions.Center; }
     }
+
+#if UNITY_EDITOR
+    void OnValidate()
+    {
+        UnityEditor.EditorApplication.delayCall += EditModePreview;
+    }
+
+    void EditModePreview()
+    {
+        if (this == null || Application.isPlaying) return;
+
+        var old = GameObject.Find("__EditSplash__");
+        if (old != null) Object.DestroyImmediate(old);
+
+        var cam = Camera.main;
+        if (cam != null)
+        {
+            cam.transform.position = new Vector3(80f, 780f, -1160f);
+            cam.transform.rotation = Quaternion.Euler(33f, -3f, 0f);
+            cam.fieldOfView        = 73f;
+            cam.farClipPlane       = 10000f;
+            cam.nearClipPlane      = 0.1f;
+            cam.clearFlags         = CameraClearFlags.SolidColor;
+            cam.backgroundColor    = Color.black;
+        }
+
+        var sun = GameObject.Find("Sun");
+        if (sun != null)
+        {
+            UnityEditor.Undo.RecordObject(sun.transform, "EditModePreview Sun");
+            sun.transform.position   = Vector3.zero;
+            sun.transform.localScale = Vector3.one * 140f;
+            // Sun material is created dynamically at runtime — don't assign
+            // Planet_Sun.mat here because its LightmapFlags break realtime emission.
+        }
+
+        var layout = new Dictionary<string, (float orbit, float scale)>
+        {
+            { "Mercury", (190f, 12f) }, { "Venus",   (235f, 22f) },
+            { "Earth",   (285f, 22f) }, { "Mars",    (340f, 16f) },
+            { "Jupiter", (490f, 88f) }, { "Saturn",  (645f, 74f) },
+            { "Uranus",  (790f, 42f) }, { "Neptune", (925f, 38f) },
+        };
+
+        var planets   = Object.FindObjectsByType<Planet>(FindObjectsInactive.Exclude);
+        float angle   = Mathf.PI * 1.05f;
+        float step    = Mathf.PI * 2f / Mathf.Max(1, planets.Length);
+
+        foreach (var p in planets)
+        {
+            if (p == null) continue;
+            string pname = (string.IsNullOrEmpty(p.data.planetName) || p.data.planetName == "Planet")
+                ? p.gameObject.name : p.data.planetName;
+
+            if (!layout.TryGetValue(pname, out var ld)) { angle += step; continue; }
+
+            UnityEditor.Undo.RecordObject(p.transform, "EditModePreview Planet");
+            p.transform.position   = new Vector3(Mathf.Cos(angle) * ld.orbit, 0f, Mathf.Sin(angle) * ld.orbit);
+            p.transform.localScale = Vector3.one * ld.scale;
+            angle += step;
+
+            var mat = Resources.Load<Material>($"Materials/Planets/Planet_{pname}");
+            if (mat != null)
+            {
+                var pr = p.GetComponentInChildren<Renderer>();
+                if (pr != null) pr.sharedMaterial = mat;
+            }
+        }
+
+        var uis = Object.FindObjectsByType<PlanetSelectionUI>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None);
+        if (uis.Length > 0)
+        {
+            var rawCanvas = uis[0].GetComponentInParent<Canvas>(true);
+            if (rawCanvas != null)
+                rawCanvas.gameObject.SetActive(false);
+        }
+    }
+#endif
 }
